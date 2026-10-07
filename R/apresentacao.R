@@ -4,7 +4,12 @@ suppressPackageStartupMessages({
   library(knitr)
   library(kableExtra)
   library(ggplot2)
+  library(gtsummary)
+  library(gt)
+  library(qqplotr)
 })
+
+theme_gtsummary_language("pt", big.mark = ".", decimal.mark = ",")
 
 # Escala divergente: Diminuiu (vermelho) <-> Não alterou (neutro) <-> Aumentou (azul)
 CORES_RESPOSTA <- c(
@@ -30,93 +35,191 @@ tema_slides <- function() {
     )
 }
 
-# Texto do teste, por exemplo "Qui-quadrado: χ²(2) = 41,33; p < 0,001; V = 0,138 (fraca)"
-descrever_teste <- function(r) {
-  p_txt <- formatar_p(r$p)
-  p_txt <- if (startsWith(p_txt, "<")) paste("p", p_txt) else paste("p =", p_txt)
-  estat <- if (r$teste == "Qui-quadrado") {
-    sprintf("χ²(%d) = %s; ", as.integer(r$gl), formatar_num(r$estatistica, 2))
-  } else {
-    ""
-  }
-  sprintf("%s: %s%s; V de Cramér = %s (%s); n = %s",
-          r$teste, estat, p_txt, formatar_num(r$v, 3), tolower(r$intensidade),
-          formatar_num(r$n, 0))
-}
-
-# Tabela completa para uma ou mais variáveis qualitativas.
-# Caselas com resíduo padronizado ajustado > 1,96 (mais casos que o esperado sob
-# independência) ficam em azul com ▲; < -1,96 (menos casos) em vermelho com ▼.
-tabela_quali <- function(resultados, legenda = NULL) {
-  linhas <- lapply(resultados, function(r) {
-    celulas <- r$celulas
-    for (i in seq_len(nrow(celulas))) {
-      for (j in seq_len(ncol(celulas))) {
-        z <- r$residuos[i, j]
-        if (z > LIMIAR_RESIDUO) {
-          celulas[i, j] <- sprintf('<span class="acima">▲ %s</span>', celulas[i, j])
-        } else if (z < -LIMIAR_RESIDUO) {
-          celulas[i, j] <- sprintf('<span class="abaixo">▼ %s</span>', celulas[i, j])
-        }
-      }
-    }
-    data.frame(
-      Categoria = rownames(celulas),
-      celulas,
-      Total = formatar_num(rowSums(r$tabela), 0),
-      check.names = FALSE
+# Estilo comum das tabelas gt nos slides
+estilo_gt <- function(tab) {
+  tab |>
+    tab_options(
+      table.font.size = px(15),
+      column_labels.font.size = px(15),
+      data_row.padding = px(3),
+      table.background.color = "#fcfcfb"
     )
-  })
-  corpo <- do.call(rbind, linhas)
-  grupos <- setNames(
-    vapply(linhas, nrow, integer(1)),
-    vapply(resultados, \(r) sprintf("%s — %s", r$rotulo, descrever_teste(r)), "")
-  )
-
-  kbl(corpo, format = "html", escape = FALSE, row.names = FALSE,
-      caption = legenda, align = c("l", "c", "c", "c", "r"),
-      col.names = c("", names(CORES_RESPOSTA), "Total")) |>
-    kable_styling(bootstrap_options = c("condensed", "hover"), full_width = FALSE) |>
-    add_header_above(c(" " = 1, "Consumo de água — n (% na linha)" = 3, " " = 1)) |>
-    pack_rows(index = grupos, label_row_css = "background:#f0efec; text-align:left;")
 }
 
-# Tabela das variáveis quantitativas: medidas-resumo por categoria + teste
-tabela_quanti <- function(resultados) {
-  abrev <- c("Diminuiu" = "D", "Não alterou" = "N", "Aumentou" = "A")
+p_negrito <- function(p) {
+  ifelse(p < ALFA, sprintf("<b>%s</b>", formatar_p(p)), formatar_p(p))
+}
+
+# Tabela completa como no livro: tbl_summary(by = resposta, percent = "row"),
+# add_p (Q = qui-quadrado, F = exato de Fisher), add_stat com o V de Cramér,
+# bold_p e destaque das caselas influentes pelos resíduos padronizados
+# (> 1,96 em azul com ▲; < -1,96 em vermelho com ▼).
+tabela_quali <- function(resultados, dados) {
+  vars <- names(resultados)
+  siglas <- vapply(resultados, \(r) if (r$teste == "Qui-quadrado") "Q" else "F", "")
+  rotulos <- Map(\(r, s) sprintf("%s<sup>%s</sup>", r$rotulo, s), resultados, siglas)
+  testes <- lapply(siglas, \(s) if (s == "Q") "chisq.test.no.correct" else "fisher.test")
+  argumentos <- lapply(siglas[siglas == "F"], \(s) list(simulate.p.value = TRUE, B = 1e5))
+
+  cramer_fun <- function(data, variable, ...) {
+    r <- resultados[[variable]]
+    tibble(`**V de Cramér**` = sprintf("%s (%s)", formatar_num(r$v, 3), tolower(r$intensidade)))
+  }
+
+  # caselas influentes: variável, categoria, coluna da resposta e sinal
+  influentes <- do.call(rbind, lapply(resultados, function(r) {
+    z <- r$residuos
+    idx <- which(abs(z) > LIMIAR_RESIDUO, arr.ind = TRUE)
+    if (nrow(idx) == 0) return(NULL)
+    data.frame(
+      variable = r$variavel,
+      label = rownames(z)[idx[, 1]],
+      coluna = paste0("stat_", idx[, 2]),
+      acima = z[idx] > 0
+    )
+  }))
+
+  set.seed(2026)
+  tbl <- dados |>
+    select(Consumo_agua, all_of(vars)) |>
+    tbl_summary(
+      by = Consumo_agua,
+      percent = "row",
+      missing = "no",
+      digits = all_categorical() ~ c(0, 1),
+      label = rotulos
+    ) |>
+    add_p(test = testes, test.args = argumentos,
+          pvalue_fun = label_style_pvalue(digits = 3)) |>
+    add_stat(fns = everything() ~ cramer_fun) |>
+    bold_p(t = ALFA) |>
+    modify_spanning_header(all_stat_cols() ~ "**Consumo de água — n (% na linha)**") |>
+    modify_header(
+      label ~ "**Variáveis**",
+      all_stat_cols() ~ "**{level}**<br>n = {n} ({style_percent(p)}%)",
+      p.value ~ "**valor-p**"
+    ) |>
+    bold_labels() |>
+    remove_footnote_header(everything())
+
+  if (!is.null(influentes)) {
+    tbl <- tbl |>
+      modify_table_body(function(corpo) {
+        for (k in seq_len(nrow(influentes))) {
+          i <- influentes[k, ]
+          linha <- corpo$variable == i$variable & corpo$row_type == "level" &
+            corpo$label == i$label
+          corpo[[i$coluna]][linha] <- paste(if (i$acima) "▲" else "▼",
+                                            corpo[[i$coluna]][linha])
+        }
+        corpo
+      })
+  }
+
+  tab <- tbl |>
+    as_gt() |>
+    fmt_markdown(columns = label) |>
+    estilo_gt()
+
+  for (k in seq_len(nrow(influentes %||% data.frame()))) {
+    i <- influentes[k, ]
+    tab <- tab |>
+      tab_style(
+        style = list(cell_fill(color = if (i$acima) "#cde2fb" else "#fadcd9"),
+                     cell_text(weight = "bold")),
+        locations = cells_body(
+          columns = all_of(i$coluna),
+          rows = variable == i$variable & row_type == "level" & label == i$label
+        )
+      )
+  }
+  tab
+}
+
+# Verificação das suposições do qui-quadrado (regra de Cochran)
+tabela_esperadas <- function(resultados) {
+  tibble(
+    Variavel = vapply(resultados, `[[`, "", "rotulo"),
+    menor = vapply(resultados, \(r) formatar_num(r$esperada_min, 1), ""),
+    pct5 = vapply(resultados, \(r) paste0(formatar_num(r$pct_esperadas_menor5, 0), "%"), ""),
+    teste = vapply(resultados, `[[`, "", "teste")
+  ) |>
+    kbl(format = "html", escape = FALSE, align = c("l", "c", "c", "l"),
+        col.names = c("Variável", "Menor freq. esperada", "% caselas com E < 5",
+                      "Teste aplicado")) |>
+    kable_styling(bootstrap_options = c("condensed", "hover"), full_width = FALSE)
+}
+
+# Diagnósticos das suposições da ANOVA para cada variável quantitativa
+tabela_diagnosticos <- function(resultados) {
   linhas <- lapply(resultados, function(r) {
-    digitos <- if (r$variavel == "Altura") 2 else 1
-    resumo <- r$resumo |>
-      mutate(txt = sprintf("%s (%s)<br>%s [%s; %s]",
-                           formatar_num(media, digitos), formatar_num(dp, digitos),
-                           formatar_num(mediana, digitos), formatar_num(q1, digitos),
-                           formatar_num(q3, digitos)))
-    sig <- r$comparacoes |> filter(p.adj < ALFA)
-    comparacoes <- if (r$p >= ALFA) {
-      "—"
-    } else if (nrow(sig) == 0) {
-      "nenhuma"
-    } else {
-      paste(sprintf("%s ≠ %s", abrev[sig$group1], abrev[sig$group2]), collapse = "<br>")
-    }
+    sw <- setNames(r$shapiro$p, as.character(r$shapiro$Consumo_agua))
     data.frame(
       Variavel = r$rotulo,
-      Diminuiu = resumo$txt[1],
-      Nao = resumo$txt[2],
-      Aumentou = resumo$txt[3],
-      Teste = r$teste,
-      p = formatar_p(r$p),
-      efeito = formatar_num(r$efeito, 3),
-      comparacoes = comparacoes
+      d = formatar_p(sw[["Diminuiu"]]),
+      n = formatar_p(sw[["Não alterou"]]),
+      a = formatar_p(sw[["Aumentou"]]),
+      tcl = if (r$amostra_grande) "Sim (n ≥ 30 em todos)" else "Não",
+      homog = sprintf("%s: %s", r$homog_teste, p_negrito(r$homog_p)),
+      decisao = sprintf("%s + %s", r$teste, r$pos_teste)
     )
   })
-
   kbl(do.call(rbind, linhas), format = "html", escape = FALSE, row.names = FALSE,
-      align = c("l", "c", "c", "c", "l", "c", "c", "c"),
-      col.names = c("Variável", names(CORES_RESPOSTA), "Teste", "valor-p", "η²<sub>H</sub>",
-                    "Comparações (Dunn-Holm)")) |>
+      align = c("l", "c", "c", "c", "c", "c", "l"),
+      col.names = c("Variável", names(CORES_RESPOSTA), "TCL", "Homocedasticidade",
+                    "Teste escolhido")) |>
     kable_styling(bootstrap_options = c("condensed", "hover"), full_width = FALSE) |>
-    add_header_above(c(" " = 1, "Média (DP) / Mediana [Q1; Q3]" = 3, " " = 4))
+    add_header_above(c(" " = 1, "Shapiro-Wilk (valor-p)" = 3, " " = 3))
+}
+
+# Tabela resumo das quantitativas como no livro: tbl_summary com média (DP),
+# add_p com oneway.test (var.equal = TRUE -> ANOVA "A"; FALSE -> Welch "W"),
+# η² e letras das comparações múltiplas (Tukey após ANOVA; Games-Howell após Welch).
+tabela_quanti <- function(resultados, dados) {
+  vars <- names(resultados)
+  rotulos <- lapply(resultados, \(r) sprintf("%s<sup>%s</sup>", r$rotulo, r$sigla))
+  argumentos <- lapply(resultados, \(r) list(var.equal = r$teste == "ANOVA"))
+
+  extras <- function(data, variable, ...) {
+    r <- resultados[[variable]]
+    letras <- if (r$p < ALFA) {
+      paste(sprintf("%s = %s", names(r$letras), r$letras), collapse = "<br>")
+    } else {
+      "—"
+    }
+    tibble(
+      `**η²**` = formatar_num(r$eta2, 3),
+      `**Comparações Múltiplas**` = letras
+    )
+  }
+
+  dados |>
+    select(Consumo_agua, all_of(vars)) |>
+    tbl_summary(
+      by = Consumo_agua,
+      type = all_continuous() ~ "continuous",
+      statistic = all_continuous() ~ "{mean} ({sd})",
+      digits = list(all_continuous() ~ c(1, 1), Altura ~ c(2, 2)),
+      label = rotulos
+    ) |>
+    add_p(
+      test = everything() ~ "oneway.test",
+      test.args = argumentos,
+      pvalue_fun = label_style_pvalue(digits = 3)
+    ) |>
+    add_stat(fns = everything() ~ extras, location = everything() ~ "label") |>
+    bold_p(t = ALFA) |>
+    modify_spanning_header(all_stat_cols() ~ "**Consumo de água — média (DP)**") |>
+    modify_header(
+      label ~ "**Variáveis**",
+      all_stat_cols() ~ "**{level}**<br>n = {n} ({style_percent(p)}%)",
+      p.value ~ "**valor-p**"
+    ) |>
+    bold_labels() |>
+    remove_footnote_header(everything()) |>
+    as_gt() |>
+    fmt_markdown(columns = c(label, `**Comparações Múltiplas**`)) |>
+    estilo_gt()
 }
 
 # Gráficos ----------------------------------------------------------------------
@@ -157,6 +260,41 @@ grafico_cramer <- function(resultados) {
     tema_slides() +
     theme(panel.grid.major.x = element_line(colour = "#e4e3df", linewidth = 0.3),
           panel.grid.major.y = element_blank())
+}
+
+dados_longos <- function(dados) {
+  dados |>
+    select(Consumo_agua, all_of(VARS_QUANTI)) |>
+    pivot_longer(-Consumo_agua, names_to = "variavel", values_to = "valor") |>
+    mutate(variavel = factor(ROTULOS[variavel], levels = ROTULOS[VARS_QUANTI]))
+}
+
+# Diagnóstico de normalidade: densidade por grupo
+grafico_densidades <- function(dados) {
+  dados_longos(dados) |>
+    ggplot(aes(valor, colour = Consumo_agua, fill = Consumo_agua)) +
+    geom_density(alpha = 0.12, linewidth = 0.8) +
+    facet_wrap(~variavel, scales = "free", nrow = 1) +
+    scale_fill_manual(values = CORES_RESPOSTA) +
+    scale_colour_manual(values = CORES_RESPOSTA) +
+    labs(x = NULL, y = "Densidade") +
+    tema_slides()
+}
+
+# Diagnóstico de normalidade: gráfico quantil-quantil por grupo
+grafico_qq <- function(dados) {
+  dados_longos(dados) |>
+    ggplot(aes(sample = valor, colour = Consumo_agua, fill = Consumo_agua)) +
+    qqplotr::stat_qq_band(alpha = 0.2, colour = NA) +
+    qqplotr::stat_qq_line(colour = "#0b0b0b", linewidth = 0.5) +
+    qqplotr::stat_qq_point(size = 0.6, alpha = 0.5) +
+    scale_fill_manual(values = CORES_RESPOSTA, guide = "none") +
+    facet_wrap(Consumo_agua ~ variavel, scales = "free", ncol = 4,
+               labeller = labeller(.multi_line = FALSE)) +
+    scale_colour_manual(values = CORES_RESPOSTA, guide = "none") +
+    labs(x = "Quantis teóricos (normal)", y = "Quantis amostrais") +
+    tema_slides() +
+    theme(strip.text.y = element_text(size = 11))
 }
 
 grafico_boxplots <- function(dados) {

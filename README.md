@@ -9,7 +9,7 @@ variável resposta sorteada, **`Consumo_água`**, e as variáveis explicativas d
 | Arquivo | Conteúdo |
 |---|---|
 | `index.qmd` | Slides: introdução, metodologia, resultados e conclusão |
-| `R/funcoes.R` | Leitura/recodificação dos dados e funções de análise (qui-quadrado/Fisher, V de Cramér, resíduos, Kruskal-Wallis etc.) |
+| `R/funcoes.R` | Leitura/recodificação dos dados e funções de análise (frequências esperadas, qui-quadrado/Fisher, resíduos padronizados, V de Cramér; Shapiro-Wilk, Bartlett/Levene, ANOVA + Tukey ou ANOVA de Welch + Games-Howell) |
 | `R/apresentacao.R` | Tabelas (`kableExtra`) e gráficos (`ggplot2`) dos slides |
 | `styles.scss` | Tema dos slides |
 | `docs/index.html` | Apresentação renderizada (publicada pelo GitHub Pages) |
@@ -20,7 +20,7 @@ variável resposta sorteada, **`Consumo_água`**, e as variáveis explicativas d
    pois os dados são da disciplina e o repositório é público.
 2. Instale os pacotes do R:
    ```r
-   install.packages(c("readxl", "dplyr", "tidyr", "rstatix", "car", "ggplot2", "knitr", "kableExtra"))
+   install.packages(c("readxl", "dplyr", "tidyr", "rstatix", "car", "ggplot2", "knitr", "kableExtra", "gtsummary", "gt", "qqplotr"))
    ```
 3. Renderize na raiz do projeto:
    ```bash

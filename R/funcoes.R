@@ -100,7 +100,7 @@ testar_associacao <- function(tab) {
   esperadas <- suppressWarnings(chisq.test(tab, correct = FALSE))$expected
   usa_qui <- all(esperadas >= 1) && mean(esperadas < 5) <= 0.20
   if (usa_qui) {
-    teste <- chisq.test(tab, correct = FALSE)
+    teste <- suppressWarnings(chisq.test(tab, correct = FALSE))
     list(teste = "Qui-quadrado", p = teste$p.value,
          estatistica = unname(teste$statistic), gl = unname(teste$parameter))
   } else {
@@ -111,28 +111,24 @@ testar_associacao <- function(tab) {
   }
 }
 
-# V de Cramér com interpretação de Cohen (1988), que depende dos graus de
-# liberdade mínimos: gl* = min(linhas, colunas) - 1.
-interpretar_v <- function(v, gl_min) {
-  limites <- switch(as.character(min(gl_min, 3)),
-    "1" = c(0.10, 0.30, 0.50),
-    "2" = c(0.07, 0.21, 0.35),
-    "3" = c(0.06, 0.17, 0.29)
-  )
-  cut(v, c(-Inf, limites, Inf), right = FALSE,
-      labels = c("Desprezível", "Fraca", "Moderada", "Forte")) |>
+# Classificação do V de Cramér adotada na disciplina (cap. 4 do livro):
+# 0-0,10 muito fraca; 0,10-0,30 fraca; 0,30-0,50 moderada; > 0,50 forte.
+interpretar_v <- function(v) {
+  cut(v, c(-Inf, 0.10, 0.30, 0.50, Inf), right = FALSE,
+      labels = c("Muito fraca", "Fraca", "Moderada", "Forte")) |>
     as.character()
 }
 
 # Tabela de contingência completa entre uma explicativa (linhas) e a resposta
-# (colunas), com n (% por linha) e resíduos padronizados ajustados.
+# (colunas), com n (% por linha), frequências esperadas e resíduos padronizados
+# (chisq.test()$stdres, como no livro).
 analisar_quali <- function(dados, var) {
   d <- dados |> filter(!is.na(.data[[var]]))
   tab <- table(d[[var]], d$Consumo_agua)
   res <- testar_associacao(tab)
-  residuos <- suppressWarnings(chisq.test(tab, correct = FALSE))$stdres
+  qui <- suppressWarnings(chisq.test(tab, correct = FALSE))
+  residuos <- qui$stdres
   v <- unname(suppressWarnings(cramer_v(tab)))
-  gl_min <- min(dim(tab)) - 1
 
   pct <- prop.table(tab, 1) * 100
   celulas <- matrix(
@@ -146,13 +142,16 @@ analisar_quali <- function(dados, var) {
     n = sum(tab),
     tabela = tab,
     celulas = celulas,
+    esperadas = qui$expected,
+    esperada_min = min(qui$expected),
+    pct_esperadas_menor5 = 100 * mean(qui$expected < 5),
     residuos = residuos,
     teste = res$teste,
     estatistica = res$estatistica,
     gl = res$gl,
     p = res$p,
     v = v,
-    intensidade = interpretar_v(v, gl_min)
+    intensidade = interpretar_v(v)
   )
 }
 
@@ -172,12 +171,50 @@ resumo_quanti <- function(dados, var) {
     )
 }
 
-# Escolha do teste para comparar a variável quantitativa entre as categorias
-# da resposta:
-# - normalidade em todos os grupos (Shapiro-Wilk) e variâncias homogêneas
-#   (Levene)  -> ANOVA + Tukey;
-# - normalidade, mas variâncias heterogêneas -> ANOVA de Welch + Games-Howell;
-# - sem normalidade -> Kruskal-Wallis + Dunn (ajuste de Holm).
+# Tamanho mínimo por grupo a partir do qual o Teorema Central do Limite garante
+# normalidade aproximada da média amostral (cap. 8 do livro: n ≳ 30).
+N_AMOSTRA_GRANDE <- 30
+
+# Letras de comparações múltiplas: grupos que compartilham uma letra não
+# diferem significativamente. Grupos ordenados da maior para a menor média.
+letras_comparacoes <- function(medias, comparacoes) {
+  grupos <- names(sort(medias, decreasing = TRUE))
+  sig <- comparacoes |> filter(p.adj < ALFA)
+  conjuntos <- list(grupos)
+  for (k in seq_len(nrow(sig))) {
+    par <- c(sig$group1[k], sig$group2[k])
+    novos <- list()
+    for (conj in conjuntos) {
+      if (all(par %in% conj)) {
+        novos <- c(novos, list(setdiff(conj, par[1]), setdiff(conj, par[2])))
+      } else {
+        novos <- c(novos, list(conj))
+      }
+    }
+    # remove conjuntos contidos em outros (absorção)
+    contido <- vapply(seq_along(novos), function(i) {
+      any(vapply(seq_along(novos), function(j) {
+        i != j && all(novos[[i]] %in% novos[[j]]) &&
+          (length(novos[[i]]) < length(novos[[j]]) || i > j)
+      }, logical(1)))
+    }, logical(1))
+    conjuntos <- novos[!contido]
+  }
+  # letras na ordem em que aparecem para o grupo de maior média
+  ordem <- order(vapply(conjuntos, \(conj) min(match(conj, grupos)), numeric(1)))
+  conjuntos <- conjuntos[ordem]
+  vapply(grupos, function(g) {
+    paste(letters[which(vapply(conjuntos, \(conj) g %in% conj, logical(1)))], collapse = "")
+  }, character(1))[names(medias)]
+}
+
+# Comparação de uma variável quantitativa entre as categorias da resposta,
+# seguindo o roteiro do livro (caps. 7 e 8) e da Atividade 5:
+# 1. normalidade por grupo: Shapiro-Wilk (+ densidade e Q-Q plot nos slides);
+#    com todos os grupos com n ≥ 30, o TCL dispensa a normalidade dos dados;
+# 2. homocedasticidade: Bartlett se os dados forem normais, Levene caso contrário;
+# 3. variâncias homogêneas -> ANOVA (oneway.test, var.equal = TRUE) + Tukey;
+#    variâncias heterogêneas -> ANOVA de Welch (var.equal = FALSE) + Games-Howell.
 analisar_quanti <- function(dados, var) {
   form <- reformulate("Consumo_agua", response = var)
 
@@ -185,43 +222,56 @@ analisar_quanti <- function(dados, var) {
     group_by(Consumo_agua) |>
     shapiro_test(vars = var)
   normal <- all(normalidade$p >= ALFA)
-  levene <- leveneTest(form, data = dados, center = median)
-  homog <- levene$`Pr(>F)`[1] >= ALFA
-
-  if (normal && homog) {
-    teste <- anova_test(dados, form)
-    tukey <- tukey_hsd(dados, form)
-    res <- list(
-      teste = "ANOVA", p = teste$p, efeito = teste$ges,
-      medida_efeito = "η² generalizado",
-      comparacoes = tukey |> select(group1, group2, p.adj)
-    )
-  } else if (normal) {
-    teste <- welch_anova_test(dados, form)
-    gh <- games_howell_test(dados, form)
-    res <- list(
-      teste = "ANOVA de Welch", p = teste$p, efeito = NA_real_,
-      medida_efeito = NA_character_,
-      comparacoes = gh |> select(group1, group2, p.adj)
-    )
-  } else {
-    teste <- kruskal_test(dados, form)
-    efeito <- kruskal_effsize(dados, form)
-    dunn <- dunn_test(dados, form, p.adjust.method = "holm")
-    res <- list(
-      teste = "Kruskal-Wallis", p = teste$p, efeito = efeito$effsize,
-      medida_efeito = "η²[H]",
-      comparacoes = dunn |> select(group1, group2, p.adj)
-    )
+  amostra_grande <- all(table(dados$Consumo_agua) >= N_AMOSTRA_GRANDE)
+  if (!normal && !amostra_grande) {
+    stop("Grupos pequenos e sem normalidade: a ANOVA não é adequada para ", var)
   }
+
+  if (normal) {
+    homog_teste <- "Bartlett"
+    homog_p <- bartlett.test(form, data = dados)$p.value
+  } else {
+    homog_teste <- "Levene"
+    homog_p <- leveneTest(form, data = dados, center = median)$`Pr(>F)`[1]
+  }
+  homog <- homog_p >= ALFA
+
+  modelo <- aov(form, data = dados)
+  somas <- summary(modelo)[[1]]$`Sum Sq`
+  eta2 <- somas[1] / sum(somas)
+
+  if (homog) {
+    teste <- oneway.test(form, data = dados, var.equal = TRUE)
+    tukey <- TukeyHSD(modelo)$Consumo_agua
+    pares <- do.call(rbind, strsplit(rownames(tukey), "-"))
+    comparacoes <- tibble(group1 = pares[, 2], group2 = pares[, 1],
+                          p.adj = tukey[, "p adj"])
+    res <- list(teste = "ANOVA", sigla = "A", pos_teste = "Tukey")
+  } else {
+    teste <- oneway.test(form, data = dados, var.equal = FALSE)
+    comparacoes <- games_howell_test(dados, form) |> select(group1, group2, p.adj)
+    res <- list(teste = "ANOVA de Welch", sigla = "W", pos_teste = "Games-Howell")
+  }
+
+  resumo <- resumo_quanti(dados, var)
+  medias <- setNames(resumo$media, as.character(resumo$Consumo_agua))
 
   c(
     list(
       variavel = var,
       rotulo = ROTULOS[[var]],
-      resumo = resumo_quanti(dados, var),
-      shapiro_p_min = min(normalidade$p),
-      levene_p = levene$`Pr(>F)`[1]
+      resumo = resumo,
+      shapiro = normalidade,
+      normal = normal,
+      amostra_grande = amostra_grande,
+      homog_teste = homog_teste,
+      homog_p = homog_p,
+      estatistica = unname(teste$statistic),
+      gl = unname(teste$parameter),
+      p = teste$p.value,
+      eta2 = eta2,
+      comparacoes = comparacoes,
+      letras = letras_comparacoes(medias, comparacoes)
     ),
     res
   )

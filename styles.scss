@@ -55,3 +55,36 @@ $presentation-h2-font-size: 1.45em;
   border-left: 6px solid #2a78d6;
   padding-left: 0.6em;
 }
+
+/* Caixas no estilo do custom.css da disciplina (cap. 6 do livro) */
+.reveal .box-blue,
+.reveal .box-green,
+.reveal .box-orange,
+.reveal .box-purple {
+  border-radius: 8px;
+  padding: 0.45em 0.7em;
+  margin: 0.35em 0;
+  font-size: 0.72em;
+  line-height: 1.35;
+}
+
+.reveal .box-blue   { background: #e8f1fc; border-left: 6px solid #2a78d6; }
+.reveal .box-green  { background: #e6f5ec; border-left: 6px solid #1baf7a; }
+.reveal .box-orange { background: #fdeee6; border-left: 6px solid #eb6834; }
+.reveal .box-purple { background: #ecebf7; border-left: 6px solid #4a3aa7; }
+
+/* Roteiro de decisão: etapas em sequência */
+.reveal .etapa {
+  text-align: center;
+  font-size: 0.6em;
+  color: #52514e;
+  margin: 0.1em 0;
+}
+
+.reveal .tabela-grande table {
+  font-size: 0.68em;
+}
+
+.reveal .tabela-grande td {
+  padding: 0.45em 0.7em;
+}
