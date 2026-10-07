@@ -50,8 +50,17 @@ nao_significativas <- setdiff(names(res_quali), significativas)
 fracas <- names(res_quali)[vapply(res_quali, \(r) r$intensidade == "Fraca", logical(1))]
 todas_qui <- all(vapply(res_quali, \(r) r$teste == "Qui-quadrado", logical(1)))
 quanti_sig <- names(res_quanti)[vapply(res_quanti, \(r) r$p < ALFA, logical(1))]
+legenda_testes <- if (todas_qui) "<sup>Q</sup> qui-quadrado" else "<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher"
+
+# Correção de Bonferroni para os 19 testes (15 qualitativas + 4 quantitativas)
+n_testes <- length(res_quali) + length(res_quanti)
+alfa_bonf <- ALFA / n_testes
+p_todos <- c(vapply(res_quali, \(r) r$p, 0), vapply(res_quanti, \(r) r$p, 0))
+robustas <- names(p_todos)[p_todos < alfa_bonf]
+frageis <- names(p_todos)[p_todos < ALFA & p_todos >= alfa_bonf]
+
 rotulos_de <- function(vars) {
-  x <- tolower(unname(ROTULOS[vars]))
+  x <- sub("covid", "COVID", tolower(sub(" \\(.*\\)$", "", unname(ROTULOS[vars]))))
   if (length(x) <= 1) return(x)
   paste(paste(head(x, -1), collapse = ", "), "e", tail(x, 1))
 }
@@ -65,6 +74,10 @@ rotulos_de <- function(vars) {
 - Houve também impacto sobre a **saúde mental**: ansiedade, depressão e insônia foram relatadas com mais frequência.
 - Essas mudanças se refletiram nos **hábitos alimentares**: tempo em casa, preparo de refeições, delivery e consumo de diferentes alimentos.
 - A **hidratação** é parte essencial de uma alimentação saudável, mas pode ser afetada pela rotina, pelo estresse e pelas condições econômicas.
+
+::: {.nota}
+Referências: Malta et al. (2020). A pandemia da COVID-19 e as mudanças no estilo de vida dos brasileiros adultos. *Epidemiologia e Serviços de Saúde*, 29(4). · Barros et al. (2020). Relato de tristeza/depressão, nervosismo/ansiedade e problemas de sono na população adulta brasileira durante a pandemia de COVID-19. *Epidemiologia e Serviços de Saúde*, 29(4).
+:::
 
 ## Problema de pesquisa
 
@@ -100,7 +113,7 @@ rotulos_de <- function(vars) {
 - **Variáveis explicativas:**
   - **15 qualitativas:** gênero, raça/cor, região, isolamento, trabalho, renda familiar, escolaridade, diagnóstico de COVID-19, consulta com nutricionista, dificuldade financeira, fumo, ansiedade, depressão, insônia e enxaqueca;
   - **4 quantitativas:** idade, peso, altura e IMC.
-  - O banco não possui variável explicativa aberta (texto livre).
+  - O banco **não possui variável aberta** (texto livre); por isso a nuvem de palavras não se aplica.
 
 ## Preparação dos dados
 
@@ -154,6 +167,10 @@ Os 2.155 participantes responderam a um único questionário, e as duas variáve
 ::: {.box-blue}
 **4. V de Cramér** — mede a **intensidade** da associação.
 :::
+
+::: {.etapa}
+Suposições: observações independentes (cada participante conta uma vez) e amostra representativa.
+:::
 :::
 
 ::: {.column width="45%"}
@@ -168,6 +185,8 @@ tibble(
 
 ::: {.nota}
 O V de Cramér não depende das suposições do qui-quadrado e pode ser usado também depois do teste de Fisher.
+
+**R:** `gtsummary` (tabelas), `rstatix` (V de Cramér, Games-Howell), `car` (Levene), `qqplotr` e `ggplot2` (gráficos); slides em **Quarto**.
 :::
 :::
 
@@ -179,7 +198,7 @@ O V de Cramér não depende das suposições do qui-quadrado e pode ser usado ta
 
 ::: {.column width="55%"}
 ::: {.box-purple}
-**1. Normalidade por grupo** — gráfico de densidade, Q-Q plot e teste de Shapiro-Wilk. Com **n ≥ 30 em todos os grupos**, o **Teorema Central do Limite** garante normalidade aproximada das médias.
+**1. Normalidade por grupo** — gráfico de densidade, Q-Q plot e teste de Shapiro-Wilk. Com **n ≥ 30 em todos os grupos**, o **Teorema Central do Limite** torna aproximadamente normal a distribuição das médias.
 :::
 ::: {.box-purple}
 **2. Homocedasticidade** — **Bartlett** se os dados forem normais; **Levene** se não forem.
@@ -194,10 +213,12 @@ O V de Cramér não depende das suposições do qui-quadrado e pode ser usado ta
 :::
 
 ::: {.column width="45%"}
-- A ANOVA de Welch **não assume variâncias iguais**: pondera cada grupo pelo inverso da sua variância e ajusta os graus de liberdade.
-- Games-Howell adapta o teste de Tukey usando **variâncias e graus de liberdade próprios** de cada par.
-- **Nível de significância:** 5% em todos os testes.
-- **R:** `gtsummary`, `gt`, `rstatix`, `car`, `qqplotr`, `ggplot2`, `dplyr`, `readxl`, `kableExtra`; slides em **Quarto** publicados no **GitHub Pages**.
+::: {.nota}
+- **ANOVA de Welch:** não assume variâncias iguais; Games-Howell adapta o Tukey com variâncias próprias de cada par.
+- **η²:** proporção da variabilidade explicada pelos grupos (≈ 0,01 pequeno; 0,06 médio; 0,14 grande).
+- **Letras:** grupos com a mesma letra não diferem.
+- **Significância:** 5%. Como são `r n_testes` testes, indicamos também quem resiste à correção de **Bonferroni** (α = 0,05/`r n_testes` ≈ `r formatar_num(alfa_bonf, 4)`).
+:::
 :::
 
 ::::
@@ -228,7 +249,7 @@ tabela_esperadas(res_quali)
 `r if (todas_qui) "Todas as tabelas atendem à regra de Cochran, então o **qui-quadrado** foi aplicado em todas (sem necessidade do teste exato de Fisher)." else "Nas tabelas que não atendem à regra de Cochran foi aplicado o **teste exato de Fisher** (valor-p por simulação de Monte Carlo)."`
 :::
 
-## Visão geral das associações
+## Visão geral das associações {.smaller}
 
 :::: {.columns}
 
@@ -246,6 +267,7 @@ grafico_cramer(res_quali)
 - Sem associação: **trabalho** e **fumo**.
 - Intensidade **fraca** para `r rotulos_de(fracas)`; **muito fraca** para as demais.
 - Com n ≈ 2.150, até associações fracas resultam em p < 0,05: por isso o **V de Cramér** é indispensável.
+- Não resistem à correção de Bonferroni: `r rotulos_de(intersect(frageis, VARS_QUALI))`.
 :::
 
 ::::
@@ -257,7 +279,7 @@ tabela_quali(res_quali[c("Genero", "Raca_cor")], dados)
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
@@ -271,11 +293,11 @@ tabela_quali(res_quali["Regiao"], dados)
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
-No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. Uma hipótese é a diferença de **clima** entre as regiões. O **Nordeste** também teve mais redução que o esperado.
+No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. O **Nordeste**, também de clima quente, teve mais **redução** que o esperado: o clima sozinho **não explica** o padrão regional, que pode refletir diferenças de renda, rotina e perfil da amostra em cada região.
 :::
 
 ## Renda familiar e escolaridade
@@ -285,7 +307,7 @@ tabela_quali(res_quali[c("Renda_familiar", "Escolaridade")], dados)
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
@@ -299,7 +321,7 @@ tabela_quali(res_quali[c("Isolamento", "Covid", "Dificuldade_Financeira", "Consu
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
@@ -313,7 +335,7 @@ tabela_quali(res_quali[c("Ansiedade", "Depressao", "Insonia", "Enxaqueca")], dad
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
@@ -327,11 +349,11 @@ tabela_quali(res_quali[c("Trabalha", "cigarro")], dados)
 ```
 
 ::: {.legenda-residuo}
-<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
 :::
 
 ::: {.nota}
-Nenhuma das duas variáveis apresentou associação significativa (p ≥ 0,05). Sem associação global, os resíduos não devem ser interpretados.
+Nenhuma das duas variáveis apresentou associação significativa (p ≥ 0,05). Sem associação global, os resíduos não são interpretados e nenhuma casela é destacada.
 :::
 
 ## Quantitativas: gráficos de densidade
@@ -357,7 +379,7 @@ grafico_qq(dados)
 ```
 
 ::: {.nota}
-Os pontos se afastam da reta e da banda de confiança nas caudas, indicando **desvio da normalidade**.
+Em **idade**, **peso** e **IMC**, os pontos saem da banda de confiança nas caudas (**desvio da normalidade**). A **altura** fica quase toda dentro da banda.
 :::
 
 ## Quantitativas: escolha do teste
@@ -367,7 +389,7 @@ tabela_diagnosticos(res_quanti)
 ```
 
 ::: {.nota}
-O Shapiro-Wilk rejeita a normalidade em todos os grupos, e os gráficos mostram **assimetria à direita**. Como todos os grupos têm **n ≥ 30** (mínimo de `r formatar_num(min(table(dados$Consumo_agua)), 0)`), o **TCL** garante normalidade aproximada das médias e a ANOVA é robusta. Como os dados não são normais, a homocedasticidade foi verificada pelo **Levene**.
+O Shapiro-Wilk rejeita a normalidade em todos os grupos, mas com grupos tão grandes ele detecta até **desvios pequenos** (como na altura). Como todos os grupos têm **n ≥ 30** (mínimo de `r formatar_num(min(table(dados$Consumo_agua)), 0)`), pelo **TCL** as médias são aproximadamente normais e a ANOVA é robusta. Sem normalidade dos dados, a homocedasticidade foi verificada pelo **Levene**.
 :::
 
 ## Quantitativas: tabela resumo
@@ -381,7 +403,7 @@ tabela_quanti(res_quanti, dados)
 :::
 
 ::: {.nota}
-Quem **reduziu** o consumo de água é, em média, **mais jovem** (`r media("Idade", "Diminuiu")` anos, contra `r media("Idade", "Não alterou")` em *Não alterou* e `r media("Idade", "Aumentou")` em *Aumentou*). Os efeitos são **pequenos** (η² ≤ `r formatar_num(max(vapply(res_quanti, \(r) r$eta2, 0)), 3)`).
+Quem **reduziu** o consumo de água é, em média, **mais jovem** (`r media("Idade", "Diminuiu")` anos, contra `r media("Idade", "Não alterou")` em *Não alterou* e `r media("Idade", "Aumentou")` em *Aumentou*) e tem **peso um pouco menor**. Os efeitos são **pequenos** (η² ≤ `r formatar_num(max(vapply(res_quanti, \(r) r$eta2, 0)), 3)`), e o peso não resiste à correção de Bonferroni.
 :::
 
 ## Quantitativas: distribuição
@@ -399,27 +421,35 @@ Os boxplots confirmam o padrão da tabela: o grupo *Diminuiu* concentra pessoas 
 
 # Conclusão
 
-## Principais achados
+## Principais achados {.smaller}
 
 - O objetivo foi avaliar a associação entre a **mudança no consumo de água** e as variáveis explicativas. Quase metade da amostra **aumentou** o consumo.
 - **Redução** do consumo associou-se a **sofrimento emocional** (ansiedade, depressão, insônia, enxaqueca), **dificuldade financeira**, **menor escolaridade**, **gênero feminino** e **menor idade**.
 - **Aumento** associou-se a **isolamento**, **diagnóstico de COVID-19**, **consulta com nutricionista**, região **Norte** e raça/cor **parda/preta**.
 - **Maior renda** e **pós-graduação** associaram-se à **manutenção** do hábito.
 - **Idade** e **peso** diferem entre os grupos (*Diminuiu* com menores médias); **altura** e **IMC**, não.
-- Todas as associações são de intensidade **fraca ou muito fraca**.
+- Todas as associações são de intensidade **fraca ou muito fraca**. Com a correção de Bonferroni, as evidências de `r rotulos_de(frageis)` ficam **mais frágeis**.
 
 ## Interpretação, limitações e contribuição {.smaller}
 
 - **Interpretações possíveis:** o estresse e a desorganização da rotina podem prejudicar o autocuidado, incluindo a hidratação. O acompanhamento nutricional e a própria infecção por COVID-19 podem ter reforçado a orientação de beber mais água. O clima pode explicar parte das diferenças regionais.
 - **Limitações:**
-  - amostra de conveniência (online, majoritariamente feminina, do Sudeste e com pós-graduação);
+  - amostra de conveniência online: `r formatar_num(100 * mean(dados$Genero == "Feminino", na.rm = TRUE), 0)`% mulheres; Sudeste (`r formatar_num(100 * mean(dados$Regiao == "Sudeste"), 0)`%) e pós-graduação (`r formatar_num(100 * mean(dados$Escolaridade == "Pós-graduação", na.rm = TRUE), 0)`%) são os maiores grupos;
   - dados autorrelatados e delineamento transversal (associação não é causalidade);
   - análises bivariadas, sem controle de confundimento (por exemplo, a diferença de peso pode refletir a maior proporção de mulheres em *Diminuiu*);
-  - muitos testes (19) ao nível de 5%, o que aumenta a chance de algum falso positivo.
+  - a resposta é ordinal, mas o qui-quadrado não usa essa ordem.
 
 ::: {.box-green}
 **Contribuição para a sociedade:** os resultados apontam grupos prioritários para ações de promoção da hidratação em situações de crise: pessoas com sofrimento emocional, com dificuldade financeira e com menor escolaridade. Também mostram o papel do **acompanhamento nutricional** no autocuidado.
 :::
+
+## {.center}
+
+<h2 style="text-align:center;">Obrigado!</h2>
+
+<p style="text-align:center;" class="slide-subtitle">Lucas Rodrigo de Moura Aragão</p>
+
+# Apêndice
 
 ## O que a disciplina trouxe para este projeto
 
@@ -448,9 +478,3 @@ tibble(
   column_spec(1, bold = TRUE, width = "16em")
 ```
 :::
-
-## {.center}
-
-<h2 style="text-align:center;">Obrigado!</h2>
-
-<p style="text-align:center;" class="slide-subtitle">Lucas Rodrigo de Moura Aragão</p>

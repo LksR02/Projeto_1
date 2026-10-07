@@ -20,6 +20,10 @@ CORES_RESPOSTA <- c(
 
 LIMIAR_RESIDUO <- qnorm(1 - ALFA / 2)  # 1,96
 
+# Destaque das caselas influentes (cores distintas das da resposta)
+COR_ACIMA <- "#e4def7"
+COR_ABAIXO <- "#fbecc0"
+
 tema_slides <- function() {
   theme_minimal(base_size = 15) +
     theme(
@@ -36,12 +40,12 @@ tema_slides <- function() {
 }
 
 # Estilo comum das tabelas gt nos slides
-estilo_gt <- function(tab) {
+estilo_gt <- function(tab, fonte = 17, espaco = 4) {
   tab |>
     tab_options(
-      table.font.size = px(15),
-      column_labels.font.size = px(15),
-      data_row.padding = px(3),
+      table.font.size = px(fonte),
+      column_labels.font.size = px(fonte),
+      data_row.padding = px(espaco),
       table.background.color = "#fcfcfb"
     )
 }
@@ -53,11 +57,13 @@ p_negrito <- function(p) {
 # Tabela completa como no livro: tbl_summary(by = resposta, percent = "row"),
 # add_p (Q = qui-quadrado, F = exato de Fisher), add_stat com o V de Cramér,
 # bold_p e destaque das caselas influentes pelos resíduos padronizados
-# (> 1,96 em azul com ▲; < -1,96 em vermelho com ▼).
+# (> 1,96 com ▲; < -1,96 com ▼). Como no livro, os resíduos só são destacados
+# quando a associação global é significativa.
 tabela_quali <- function(resultados, dados) {
   vars <- names(resultados)
   siglas <- vapply(resultados, \(r) if (r$teste == "Qui-quadrado") "Q" else "F", "")
-  rotulos <- Map(\(r, s) sprintf("%s<sup>%s</sup>", r$rotulo, s), resultados, siglas)
+  rotulos <- Map(\(r, s) sprintf("%s<sup>%s</sup> (n = %s)", r$rotulo, s, formatar_num(r$n, 0)),
+                 resultados, siglas)
   testes <- lapply(siglas, \(s) if (s == "Q") "chisq.test.no.correct" else "fisher.test")
   argumentos <- lapply(siglas[siglas == "F"], \(s) list(simulate.p.value = TRUE, B = 1e5))
 
@@ -68,6 +74,7 @@ tabela_quali <- function(resultados, dados) {
 
   # caselas influentes: variável, categoria, coluna da resposta e sinal
   influentes <- do.call(rbind, lapply(resultados, function(r) {
+    if (r$p >= ALFA) return(NULL)
     z <- r$residuos
     idx <- which(abs(z) > LIMIAR_RESIDUO, arr.ind = TRUE)
     if (nrow(idx) == 0) return(NULL)
@@ -96,7 +103,7 @@ tabela_quali <- function(resultados, dados) {
     modify_spanning_header(all_stat_cols() ~ "**Consumo de água — n (% na linha)**") |>
     modify_header(
       label ~ "**Variáveis**",
-      all_stat_cols() ~ "**{level}**<br>n = {n} ({style_percent(p)}%)",
+      all_stat_cols() ~ "**{level}**",
       p.value ~ "**valor-p**"
     ) |>
     bold_labels() |>
@@ -125,7 +132,7 @@ tabela_quali <- function(resultados, dados) {
     i <- influentes[k, ]
     tab <- tab |>
       tab_style(
-        style = list(cell_fill(color = if (i$acima) "#cde2fb" else "#fadcd9"),
+        style = list(cell_fill(color = if (i$acima) COR_ACIMA else COR_ABAIXO),
                      cell_text(weight = "bold")),
         locations = cells_body(
           columns = all_of(i$coluna),
@@ -140,7 +147,7 @@ tabela_quali <- function(resultados, dados) {
 tabela_esperadas <- function(resultados) {
   tibble(
     Variavel = vapply(resultados, `[[`, "", "rotulo"),
-    menor = vapply(resultados, \(r) formatar_num(r$esperada_min, 1), ""),
+    menor = vapply(resultados, \(r) formatar_num(r$esperada_min, 2), ""),
     pct5 = vapply(resultados, \(r) paste0(formatar_num(r$pct_esperadas_menor5, 0), "%"), ""),
     teste = vapply(resultados, `[[`, "", "teste")
   ) |>
@@ -197,9 +204,9 @@ tabela_quanti <- function(resultados, dados) {
     select(Consumo_agua, all_of(vars)) |>
     tbl_summary(
       by = Consumo_agua,
-      type = all_continuous() ~ "continuous",
-      statistic = all_continuous() ~ "{mean} ({sd})",
-      digits = list(all_continuous() ~ c(1, 1), Altura ~ c(2, 2)),
+      type = all_continuous() ~ "continuous2",
+      statistic = all_continuous2() ~ c("{mean} ({sd})", "{median} [{p25}; {p75}]"),
+      digits = list(all_continuous2() ~ 1, Altura ~ 2),
       label = rotulos
     ) |>
     add_p(
@@ -209,7 +216,7 @@ tabela_quanti <- function(resultados, dados) {
     ) |>
     add_stat(fns = everything() ~ extras, location = everything() ~ "label") |>
     bold_p(t = ALFA) |>
-    modify_spanning_header(all_stat_cols() ~ "**Consumo de água — média (DP)**") |>
+    modify_spanning_header(all_stat_cols() ~ "**Consumo de água**") |>
     modify_header(
       label ~ "**Variáveis**",
       all_stat_cols() ~ "**{level}**<br>n = {n} ({style_percent(p)}%)",
@@ -217,9 +224,17 @@ tabela_quanti <- function(resultados, dados) {
     ) |>
     bold_labels() |>
     remove_footnote_header(everything()) |>
+    modify_table_body(\(corpo) mutate(
+      corpo,
+      label = dplyr::case_when(
+        row_type == "level" & startsWith(label, "Média") ~ "Média (DP)",
+        row_type == "level" & startsWith(label, "Mediana") ~ "Mediana [Q1; Q3]",
+        TRUE ~ label
+      )
+    )) |>
     as_gt() |>
     fmt_markdown(columns = c(label, `**Comparações Múltiplas**`)) |>
-    estilo_gt()
+    estilo_gt(fonte = 15, espaco = 1)
 }
 
 # Gráficos ----------------------------------------------------------------------
