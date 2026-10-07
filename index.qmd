@@ -118,31 +118,9 @@ Referências: Malta et al. (2020). A pandemia da COVID-19 e as mudanças no esti
 ## Preparação dos dados
 
 - Respostas **"Prefiro não responder/declarar"** e **"Não desejo informar"** foram tratadas como não resposta e excluídas apenas da análise da variável correspondente.
-- Categorias raras foram **agrupadas**, sempre com **sentido substantivo**, para evitar frequências esperadas muito baixas:
-  - Raça/cor: Amarela + Indígena + Outro → **Amarela/Indígena/Outra** (n = 39);
-  - Escolaridade: Analfabeto + Ens. Fundamental + Ens. Médio → **Até Ensino Médio** (n = 748).
-- Gênero **"Outro"** (n = 6) não pôde ser agrupado de forma coerente e foi excluído da análise de gênero.
+- Categorias raras (por exemplo, gênero "Outro", n = 6; raça/cor Indígena, n = 9) foram **mantidas**: quando geram frequências esperadas baixas, usamos o **teste exato de Fisher**.
+- Só a **Escolaridade** foi agregada, porque é uma escala ordenada e o grupo tem **sentido substantivo**: Analfabeto + Ens. Fundamental + Ens. Médio → **Até Ensino Médio** (n = 748).
 - Assim, o n de cada análise varia de `r formatar_num(min(vapply(res_quali, \(r) r$n, 0)), 0)` a `r formatar_num(n_total, 0)`.
-
-## Independência, homogeneidade ou aderência?
-
-Os três testes usam a **mesma estatística**, χ² = Σ (O − E)² / E, mas respondem a **perguntas diferentes**:
-
-::: {.box-green}
-**Independência** — *uma* amostra classificada segundo *duas* variáveis: a distribuição de uma depende da categoria da outra? **← é o nosso caso**
-:::
-
-::: {.box-orange}
-**Homogeneidade** — amostras coletadas *separadamente* em cada população: os grupos têm a mesma distribuição?
-:::
-
-::: {.box-purple}
-**Aderência** — *uma* variável: os dados seguem uma distribuição teórica específica?
-:::
-
-::: {.nota}
-Os 2.155 participantes responderam a um único questionário, e as duas variáveis foram observadas na mesma pessoa. Por isso, aplicamos o **teste de independência**.
-:::
 
 ## Roteiro de análise: variáveis qualitativas
 
@@ -156,7 +134,7 @@ Os 2.155 participantes responderam a um único questionário, e as duas variáve
 ↓ atendida: **qui-quadrado** · não atendida: **exato de Fisher**
 :::
 ::: {.box-blue}
-**2. Teste de independência:** H₀: as variáveis são independentes. Rejeita-se H₀ se valor-p ≤ 5%.
+**2. Teste de independência** (uma amostra, duas variáveis): H₀: as variáveis são independentes. Rejeita-se H₀ se valor-p ≤ 5%.
 :::
 ::: {.etapa}
 ↓ o teste diz *se* há associação, mas não *onde*
@@ -166,10 +144,6 @@ Os 2.155 participantes responderam a um único questionário, e as duas variáve
 :::
 ::: {.box-blue}
 **4. V de Cramér** — mede a **intensidade** da associação.
-:::
-
-::: {.etapa}
-Suposições: observações independentes (cada participante conta uma vez) e amostra representativa.
 :::
 :::
 
@@ -186,7 +160,9 @@ tibble(
 ::: {.nota}
 O V de Cramér não depende das suposições do qui-quadrado e pode ser usado também depois do teste de Fisher.
 
-**R:** `gtsummary` (tabelas), `rstatix` (V de Cramér, Games-Howell), `car` (Levene), `qqplotr` e `ggplot2` (gráficos); slides em **Quarto**.
+**Suposições:** observações independentes (cada participante conta uma vez) e amostra representativa, que **não é garantida** aqui (amostra de conveniência; ver limitações).
+
+**Pacotes do R:** `readxl` e `dplyr` (dados), `gtsummary` (tabelas), `rstatix` (V de Cramér, Games-Howell), `car` (Levene), `qqplotr` e `ggplot2` (gráficos); slides em **Quarto**.
 :::
 :::
 
@@ -239,16 +215,6 @@ grafico_resposta(dados)
 Quase metade dos participantes (**`r pct_geral("Aumentou")`%**) relatou **aumento** no consumo de água durante a pandemia; apenas **`r pct_geral("Diminuiu")`%** relatou redução.
 :::
 
-## Verificação das suposições do qui-quadrado
-
-```{r}
-tabela_esperadas(res_quali)
-```
-
-::: {.nota}
-`r if (todas_qui) "Todas as tabelas atendem à regra de Cochran, então o **qui-quadrado** foi aplicado em todas (sem necessidade do teste exato de Fisher)." else "Nas tabelas que não atendem à regra de Cochran foi aplicado o **teste exato de Fisher** (valor-p por simulação de Monte Carlo)."`
-:::
-
 ## Visão geral das associações {.smaller}
 
 :::: {.columns}
@@ -279,11 +245,11 @@ tabela_quali(res_quali[c("Genero", "Raca_cor")], dados)
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
-**Mulheres** relataram mais **redução** no consumo de água (`r pct("Genero", "Feminino", "Diminuiu")`% vs `r pct("Genero", "Masculino", "Diminuiu")`% nos homens). Pessoas **pardas** e **pretas** relataram mais **aumento**; pessoas **brancas**, mais **manutenção**.
+Com categorias raras (gênero "Outro", raça/cor Amarela, Indígena e Outro), a regra de Cochran não é atendida e usamos o **exato de Fisher**. **Mulheres** relataram mais **redução** (`r pct("Genero", "Feminino", "Diminuiu")`% vs `r pct("Genero", "Masculino", "Diminuiu")`% nos homens). Pessoas **pardas** e **pretas** relataram mais **aumento**; **brancas**, mais **manutenção**.
 :::
 
 ## Região
@@ -293,11 +259,11 @@ tabela_quali(res_quali["Regiao"], dados)
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
-No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. O **Nordeste**, também de clima quente, teve mais **redução** que o esperado: o clima sozinho **não explica** o padrão regional, que pode refletir diferenças de renda, rotina e perfil da amostra em cada região.
+No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. O **Nordeste**, também quente, teve mais **redução** que o esperado. O clima não foi medido e, sozinho, não explica o padrão; diferenças de renda, rotina e perfil da amostra em cada região são outras hipóteses.
 :::
 
 ## Renda familiar e escolaridade
@@ -307,7 +273,7 @@ tabela_quali(res_quali[c("Renda_familiar", "Escolaridade")], dados)
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
@@ -321,7 +287,7 @@ tabela_quali(res_quali[c("Isolamento", "Covid", "Dificuldade_Financeira", "Consu
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
@@ -335,7 +301,7 @@ tabela_quali(res_quali[c("Ansiedade", "Depressao", "Insonia", "Enxaqueca")], dad
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
@@ -349,37 +315,11 @@ tabela_quali(res_quali[c("Trabalha", "cigarro")], dados)
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96 (destacada só quando p < 0,05)
+`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
 :::
 
 ::: {.nota}
 Nenhuma das duas variáveis apresentou associação significativa (p ≥ 0,05). Sem associação global, os resíduos não são interpretados e nenhuma casela é destacada.
-:::
-
-## Quantitativas: gráficos de densidade
-
-```{r}
-#| label: grafico-densidades
-#| fig-width: 12
-#| fig-height: 4.6
-grafico_densidades(dados)
-```
-
-::: {.nota}
-As distribuições de **idade**, **peso** e **IMC** são **assimétricas à direita** em todos os grupos; a altura é mais simétrica.
-:::
-
-## Quantitativas: gráficos Q-Q
-
-```{r}
-#| label: grafico-qq
-#| fig-width: 12
-#| fig-height: 5.4
-grafico_qq(dados)
-```
-
-::: {.nota}
-Em **idade**, **peso** e **IMC**, os pontos saem da banda de confiança nas caudas (**desvio da normalidade**). A **altura** fica quase toda dentro da banda.
 :::
 
 ## Quantitativas: escolha do teste
@@ -389,7 +329,7 @@ tabela_diagnosticos(res_quanti)
 ```
 
 ::: {.nota}
-O Shapiro-Wilk rejeita a normalidade em todos os grupos, mas com grupos tão grandes ele detecta até **desvios pequenos** (como na altura). Como todos os grupos têm **n ≥ 30** (mínimo de `r formatar_num(min(table(dados$Consumo_agua)), 0)`), pelo **TCL** as médias são aproximadamente normais e a ANOVA é robusta. Sem normalidade dos dados, a homocedasticidade foi verificada pelo **Levene**.
+Gráficos de densidade e Q-Q no apêndice. O Shapiro-Wilk rejeita a normalidade em todos os grupos, mas com grupos tão grandes detecta até **desvios pequenos**. Com **n ≥ 30** em todos (mínimo de `r formatar_num(min(table(dados$Consumo_agua)), 0)`), pelo **TCL** as médias são aproximadamente normais. Para **mais de 2 grupos**, o livro indica verificar a homocedasticidade (Levene, sem normalidade). O Levene também é sensível a n grande, mas os valores-p estão longe de 5%, então a decisão não depende do limiar.
 :::
 
 ## Quantitativas: tabela resumo
@@ -403,7 +343,7 @@ tabela_quanti(res_quanti, dados)
 :::
 
 ::: {.nota}
-Quem **reduziu** o consumo de água é, em média, **mais jovem** (`r media("Idade", "Diminuiu")` anos, contra `r media("Idade", "Não alterou")` em *Não alterou* e `r media("Idade", "Aumentou")` em *Aumentou*) e tem **peso um pouco menor**. Os efeitos são **pequenos** (η² ≤ `r formatar_num(max(vapply(res_quanti, \(r) r$eta2, 0)), 3)`), e o peso não resiste à correção de Bonferroni.
+**Idade:** as três médias diferem entre si (*Não alterou* `r media("Idade", "Não alterou")` > *Aumentou* `r media("Idade", "Aumentou")` > *Diminuiu* `r media("Idade", "Diminuiu")` anos), com efeito **pequeno** (η² = `r formatar_num(res_quanti$Idade$eta2, 3)`). **Peso:** *Diminuiu* tem média menor, mas o efeito é **desprezível** (η² = `r formatar_num(res_quanti$Peso$eta2, 3)`) e não resiste à correção de Bonferroni. **Altura** e **IMC:** sem evidência de diferença.
 :::
 
 ## Quantitativas: distribuição
@@ -416,7 +356,7 @@ grafico_boxplots(dados)
 ```
 
 ::: {.nota}
-Os boxplots confirmam o padrão da tabela: o grupo *Diminuiu* concentra pessoas **mais jovens** e tem **peso um pouco menor**. Altura e IMC **não diferem** entre os grupos (p ≥ 0,05).
+Os boxplots confirmam o padrão da tabela: o grupo *Diminuiu* concentra pessoas **mais jovens**. Para altura e IMC, **não há evidência de diferença** entre os grupos (p ≥ 0,05).
 :::
 
 # Conclusão
@@ -427,20 +367,30 @@ Os boxplots confirmam o padrão da tabela: o grupo *Diminuiu* concentra pessoas 
 - **Redução** do consumo associou-se a **sofrimento emocional** (ansiedade, depressão, insônia, enxaqueca), **dificuldade financeira**, **menor escolaridade**, **gênero feminino** e **menor idade**.
 - **Aumento** associou-se a **isolamento**, **diagnóstico de COVID-19**, **consulta com nutricionista**, região **Norte** e raça/cor **parda/preta**.
 - **Maior renda** e **pós-graduação** associaram-se à **manutenção** do hábito.
-- **Idade** e **peso** diferem entre os grupos (*Diminuiu* com menores médias); **altura** e **IMC**, não.
+- **Idade** difere entre os três grupos (*Diminuiu* é o mais jovem); o **peso** tem diferença desprezível; para **altura** e **IMC** não há evidência de diferença.
 - Todas as associações são de intensidade **fraca ou muito fraca**. Com a correção de Bonferroni, as evidências de `r rotulos_de(frageis)` ficam **mais frágeis**.
 
-## Interpretação, limitações e contribuição {.smaller}
+## Interpretação e limitações {.smaller}
 
-- **Interpretações possíveis:** o estresse e a desorganização da rotina podem prejudicar o autocuidado, incluindo a hidratação. O acompanhamento nutricional e a própria infecção por COVID-19 podem ter reforçado a orientação de beber mais água. O clima pode explicar parte das diferenças regionais.
+- **Interpretações possíveis (hipóteses, não testadas aqui):** o estresse e a desorganização da rotina podem prejudicar o autocuidado, incluindo a hidratação. Quem consultou nutricionista ou teve COVID-19 pode ter recebido orientação para beber mais água. Clima, renda e rotina podem contribuir para as diferenças regionais.
 - **Limitações:**
   - amostra de conveniência online: `r formatar_num(100 * mean(dados$Genero == "Feminino", na.rm = TRUE), 0)`% mulheres; Sudeste (`r formatar_num(100 * mean(dados$Regiao == "Sudeste"), 0)`%) e pós-graduação (`r formatar_num(100 * mean(dados$Escolaridade == "Pós-graduação", na.rm = TRUE), 0)`%) são os maiores grupos;
   - dados autorrelatados e delineamento transversal (associação não é causalidade);
   - análises bivariadas, sem controle de confundimento (por exemplo, a diferença de peso pode refletir a maior proporção de mulheres em *Diminuiu*);
   - a resposta é ordinal, mas o qui-quadrado não usa essa ordem.
 
+## Contribuição para a sociedade
+
 ::: {.box-green}
-**Contribuição para a sociedade:** os resultados apontam grupos prioritários para ações de promoção da hidratação em situações de crise: pessoas com sofrimento emocional, com dificuldade financeira e com menor escolaridade. Também mostram o papel do **acompanhamento nutricional** no autocuidado.
+Os resultados **sugerem** grupos a observar em ações de promoção da hidratação em situações de crise: pessoas com **sofrimento emocional** (ansiedade, depressão, insônia) e com **dificuldade financeira**, as associações mais consistentes.
+:::
+
+::: {.box-blue}
+A associação entre **consulta com nutricionista** e **aumento** do consumo de água é compatível com o valor do acompanhamento nutricional, mas o desenho transversal **não permite inferir efeito**.
+:::
+
+::: {.box-orange}
+Todas as associações são **fracas ou muito fracas**: elas indicam **tendências na população**, não preveem o comportamento de cada pessoa.
 :::
 
 ## {.center}
@@ -477,4 +427,60 @@ tibble(
   kable_styling(bootstrap_options = c("condensed", "hover"), full_width = FALSE) |>
   column_spec(1, bold = TRUE, width = "16em")
 ```
+:::
+
+## Independência, homogeneidade ou aderência?
+
+Os três testes usam a **mesma estatística**, χ² = Σ (O − E)² / E, mas respondem a **perguntas diferentes**:
+
+::: {.box-green}
+**Independência** — *uma* amostra classificada segundo *duas* variáveis: a distribuição de uma depende da categoria da outra? **← é o nosso caso**
+:::
+
+::: {.box-orange}
+**Homogeneidade** — amostras coletadas *separadamente* em cada população: os grupos têm a mesma distribuição?
+:::
+
+::: {.box-purple}
+**Aderência** — *uma* variável: os dados seguem uma distribuição teórica específica?
+:::
+
+::: {.nota}
+Os 2.155 participantes responderam a um único questionário, e as duas variáveis foram observadas na mesma pessoa. Por isso, aplicamos o **teste de independência**.
+:::
+
+## Verificação das suposições do qui-quadrado
+
+```{r}
+tabela_esperadas(res_quali)
+```
+
+::: {.nota}
+`r if (todas_qui) "Todas as tabelas atendem à regra de Cochran, então o **qui-quadrado** foi aplicado em todas (sem necessidade do teste exato de Fisher)." else "Nas tabelas que não atendem à regra de Cochran foi aplicado o **teste exato de Fisher** (valor-p por simulação de Monte Carlo)."`
+:::
+
+## Quantitativas: gráficos de densidade
+
+```{r}
+#| label: grafico-densidades
+#| fig-width: 12
+#| fig-height: 4.6
+grafico_densidades(dados)
+```
+
+::: {.nota}
+As distribuições de **idade**, **peso** e **IMC** são **assimétricas à direita** em todos os grupos; a altura é mais simétrica.
+:::
+
+## Quantitativas: gráficos Q-Q
+
+```{r}
+#| label: grafico-qq
+#| fig-width: 12
+#| fig-height: 5.4
+grafico_qq(dados)
+```
+
+::: {.nota}
+Em **idade**, **peso** e **IMC**, os pontos saem da banda de confiança nas caudas (**desvio da normalidade**). A **altura** fica quase toda dentro da banda.
 :::

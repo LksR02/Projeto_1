@@ -47,24 +47,21 @@ NIVEIS_RESPOSTA <- c("Diminuiu", "Não alterou", "Aumentou")
 # Leitura e recodificação --------------------------------------------------
 # - "Prefiro não responder/declarar" e "Não desejo informar" viram NA
 #   (não resposta), e esses casos saem apenas da análise da variável em questão;
-# - categorias muito raras são agrupadas para evitar frequências esperadas
-#   muito baixas (Raça/cor e Escolaridade);
-# - Gênero "Outro" (n = 6) não pode ser agrupado de forma substantiva com
-#   nenhuma outra categoria e é tratado como NA na análise de Gênero.
+# - categorias raras são mantidas (o teste exato de Fisher cuida das
+#   frequências esperadas baixas); só a Escolaridade é agregada, porque as
+#   categorias são ordenadas e "Até Ensino Médio" tem sentido substantivo.
 ler_dados <- function(caminho = "data/Nutricao.xlsx") {
   read_excel(caminho) |>
     mutate(
       Consumo_agua = factor(`Consumo_água`, levels = NIVEIS_RESPOSTA),
       Genero = factor(
-        na_if(na_if(Genero, "Prefiro não responder"), "Outro"),
-        levels = c("Feminino", "Masculino")
+        na_if(Genero, "Prefiro não responder"),
+        levels = c("Feminino", "Masculino", "Outro")
       ),
-      Raca_cor = case_when(
-        Raca_cor == "Prefiro não declarar" ~ NA_character_,
-        Raca_cor %in% c("Amarela", "Indígena", "Outro") ~ "Amarela/Indígena/Outra",
-        TRUE ~ Raca_cor
-      ) |>
-        factor(levels = c("Branca", "Parda", "Preta", "Amarela/Indígena/Outra")),
+      Raca_cor = factor(
+        na_if(Raca_cor, "Prefiro não declarar"),
+        levels = c("Branca", "Parda", "Preta", "Amarela", "Indígena", "Outro")
+      ),
       Regiao = dplyr::recode(Regiao, "Centro-oeste" = "Centro-Oeste") |>
         factor(levels = c("Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul")),
       Renda_familiar = dplyr::recode(

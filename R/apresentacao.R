@@ -62,10 +62,17 @@ p_negrito <- function(p) {
 tabela_quali <- function(resultados, dados) {
   vars <- names(resultados)
   siglas <- vapply(resultados, \(r) if (r$teste == "Qui-quadrado") "Q" else "F", "")
-  rotulos <- Map(\(r, s) sprintf("%s<sup>%s</sup> (n = %s)", r$rotulo, s, formatar_num(r$n, 0)),
-                 resultados, siglas)
-  testes <- lapply(siglas, \(s) if (s == "Q") "chisq.test.no.correct" else "fisher.test")
-  argumentos <- lapply(siglas[siglas == "F"], \(s) list(simulate.p.value = TRUE, B = 1e5))
+  # o n aparece no rótulo só quando há não resposta (n menor que o total)
+  rotulos <- Map(function(r, s) {
+    n_txt <- if (r$n < nrow(dados)) sprintf(" (n = %s)", formatar_num(r$n, 0)) else ""
+    sprintf("%s<sup>%s</sup>%s", r$rotulo, s, n_txt)
+  }, resultados, siglas)
+  # o valor-p vem de analisar_quali() (mesma regra de Cochran e mesma semente
+  # do Fisher por Monte Carlo), para a tabela e o texto mostrarem o mesmo número
+  teste_fun <- function(data, variable, ...) {
+    r <- resultados[[variable]]
+    tibble(p.value = r$p, method = r$teste)
+  }
 
   cramer_fun <- function(data, variable, ...) {
     r <- resultados[[variable]]
@@ -96,7 +103,7 @@ tabela_quali <- function(resultados, dados) {
       digits = all_categorical() ~ c(0, 1),
       label = rotulos
     ) |>
-    add_p(test = testes, test.args = argumentos,
+    add_p(test = everything() ~ teste_fun,
           pvalue_fun = label_style_pvalue(digits = 3)) |>
     add_stat(fns = everything() ~ cramer_fun) |>
     bold_p(t = ALFA) |>
