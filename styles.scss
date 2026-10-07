@@ -1,0 +1,57 @@
+/*-- scss:defaults --*/
+$body-bg: #fcfcfb;
+$body-color: #0b0b0b;
+$link-color: #1c5cab;
+$presentation-heading-color: #0d366b;
+$presentation-font-size-root: 34px;
+$presentation-h2-font-size: 1.45em;
+
+/*-- scss:rules --*/
+.reveal .slide-subtitle,
+.reveal .nota {
+  color: #52514e;
+}
+
+.reveal .nota {
+  font-size: 0.6em;
+  line-height: 1.35;
+}
+
+.reveal table {
+  font-size: 0.56em;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.reveal table th,
+.reveal table td {
+  padding: 0.25em 0.6em;
+}
+
+.reveal table caption {
+  font-size: 1.1em;
+  color: #52514e;
+  caption-side: top;
+}
+
+.reveal .legenda-residuo {
+  font-size: 0.5em;
+  color: #52514e;
+  text-align: center;
+  margin-top: 0.4em;
+}
+
+.reveal .acima {
+  background: #cde2fb;
+  font-weight: 700;
+}
+
+.reveal .abaixo {
+  background: #fadcd9;
+  font-weight: 700;
+}
+
+.reveal .destaque {
+  border-left: 6px solid #2a78d6;
+  padding-left: 0.6em;
+}

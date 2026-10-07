@@ -1,0 +1,303 @@
+---
+title: "Mudanças no consumo de água durante a pandemia de COVID-19"
+subtitle: "Projeto I — fatores associados à variável resposta `Consumo_água`"
+author: "Lucas Rodrigo de Moura Aragão"
+date: last-modified
+date-format: "DD/MM/YYYY"
+format:
+  revealjs:
+    theme: [default, styles.scss]
+    slide-number: true
+    embed-resources: true
+    transition: none
+    width: 1280
+    height: 720
+    margin: 0.06
+    fig-dpi: 150
+    toc: false
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+source("R/funcoes.R")
+source("R/apresentacao.R")
+
+dados <- ler_dados("data/Nutricao.xlsx")
+
+res_quali <- setNames(lapply(VARS_QUALI, \(v) analisar_quali(dados, v)), VARS_QUALI)
+res_quanti <- setNames(lapply(VARS_QUANTI, \(v) analisar_quanti(dados, v)), VARS_QUANTI)
+
+# % (na linha) de uma resposta dentro de uma categoria de uma explicativa
+pct <- function(var, categoria, resposta) {
+  formatar_num(100 * prop.table(res_quali[[var]]$tabela, 1)[categoria, resposta], 1)
+}
+pct_geral <- function(resposta) {
+  formatar_num(100 * mean(dados$Consumo_agua == resposta), 1)
+}
+mediana <- function(var, resposta) {
+  r <- res_quanti[[var]]$resumo
+  formatar_num(r$mediana[r$Consumo_agua == resposta], 0)
+}
+
+significativas <- names(res_quali)[vapply(res_quali, \(r) r$p < ALFA, logical(1))]
+n_total <- nrow(dados)
+```
+
+# Introdução
+
+## Contexto
+
+- A pandemia de COVID-19 alterou a rotina da população: **isolamento social**, trabalho remoto, perda de renda e insegurança econômica.
+- Houve também impacto sobre a **saúde mental**: ansiedade, depressão e insônia foram relatadas com mais frequência.
+- Essas mudanças se refletiram nos **hábitos alimentares**: tempo em casa, preparo de refeições, delivery e consumo de diferentes alimentos.
+- A **hidratação** é parte essencial de uma alimentação saudável e foi reforçada nas recomendações de cuidado durante a pandemia, mas também pode ser afetada pela rotina, pelo estresse e pelo acesso a alimentos e bebidas.
+
+## Problema de pesquisa
+
+::: {.destaque}
+Variável resposta (sorteada): **`Consumo_água`** — mudança no consumo de água durante a pandemia, com as categorias *Diminuiu*, *Não alterou* e *Aumentou*.
+:::
+
+<br>
+
+- **Pergunta:** quais características sociodemográficas, econômicas, antropométricas, de contexto da pandemia e de saúde emocional estão associadas à mudança no consumo de água?
+- **Por que investigar?** Identificar grupos com maior propensão a **reduzir** a ingestão de água ajuda a orientar ações de educação alimentar e nutricional.
+
+## Objetivos
+
+**Objetivo principal**
+
+- Avaliar a associação entre a mudança no consumo de água (`Consumo_água`) e as variáveis explicativas do banco de dados.
+
+**Objetivos específicos**
+
+- Descrever o padrão de mudança no consumo de água na amostra;
+- Verificar diferenças segundo características **sociodemográficas e econômicas** (gênero, raça/cor, região, renda, escolaridade, trabalho);
+- Avaliar o papel do **contexto da pandemia** (isolamento, COVID-19, dificuldade financeira, consulta com nutricionista) e da **saúde emocional** (ansiedade, depressão, insônia, enxaqueca);
+- Comparar **idade, peso, altura e IMC** entre as categorias da resposta.
+
+# Metodologia
+
+## Dados e variáveis
+
+- **Origem:** questionário online aplicado em **2022**, durante a pandemia de COVID-19, por alunas da pós-graduação em Nutrição da UFF.
+- **Amostra:** **`r formatar_num(n_total, 0)` adultos**, sem dados faltantes no banco original.
+- **Variável resposta:** `Consumo_água` (qualitativa ordinal: Diminuiu, Não alterou, Aumentou).
+- **Variáveis explicativas:**
+  - **15 categóricas:** gênero, raça/cor, região, isolamento, trabalho, renda familiar, escolaridade, diagnóstico de COVID-19, consulta com nutricionista, dificuldade financeira, fumo, ansiedade, depressão, insônia e enxaqueca;
+  - **4 quantitativas contínuas:** idade, peso, altura e IMC.
+  - O banco não possui variável explicativa aberta (texto livre).
+
+## Preparação dos dados
+
+- Respostas **"Prefiro não responder/declarar"** e **"Não desejo informar"** foram tratadas como não resposta e excluídas apenas da análise da variável correspondente.
+- Categorias muito raras foram **agrupadas** para evitar frequências esperadas muito baixas:
+  - Raça/cor: Amarela + Indígena + Outro → **Amarela/Indígena/Outra** (n = 39);
+  - Escolaridade: Analfabeto + Ens. Fundamental + Ens. Médio → **Até Ensino Médio** (n = 748).
+- Gênero **"Outro"** (n = 6) não pôde ser agrupado de forma coerente e foi excluído da análise de gênero.
+- Assim, o n de cada análise varia de `r formatar_num(min(vapply(res_quali, \(r) r$n, 0)), 0)` a `r formatar_num(n_total, 0)`.
+
+## Métodos estatísticos {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+**Resposta × variáveis qualitativas**
+
+- **Qui-quadrado de independência**: testa se a distribuição da resposta difere entre as categorias da explicativa. Requer observações independentes e frequências esperadas adequadas (nenhuma < 1 e no máximo 20% < 5).
+- **Exato de Fisher** (Monte Carlo) se essas condições não forem atendidas.
+- **V de Cramér**: intensidade da associação (0 a 1), classificada pelos limites de Cohen conforme os graus de liberdade.
+- **Resíduos padronizados ajustados**: caselas com |resíduo| > 1,96 são **influentes**.
+:::
+
+::: {.column width="50%"}
+**Resposta × variáveis quantitativas**
+
+- **Shapiro-Wilk** (normalidade em cada grupo) e **Levene** (homogeneidade de variâncias) definem o teste:
+  - normal e homogênea → ANOVA + Tukey;
+  - normal e heterogênea → ANOVA de Welch + Games-Howell;
+  - **não normal → Kruskal-Wallis + Dunn** (ajuste de Holm), com tamanho de efeito **η²<sub>H</sub>**.
+
+**Nível de significância:** 5%.
+
+**R:** `readxl`, `dplyr`, `tidyr`, `rstatix`, `car`, `ggplot2`, `knitr`, `kableExtra`; slides em **Quarto**.
+:::
+
+::::
+
+# Resultados
+
+## Distribuição da variável resposta
+
+```{r}
+#| label: grafico-resposta
+#| fig-width: 9
+#| fig-height: 4.6
+#| fig-align: center
+grafico_resposta(dados)
+```
+
+::: {.nota}
+Quase metade dos participantes (**`r pct_geral("Aumentou")`%**) relatou **aumento** no consumo de água durante a pandemia; apenas **`r pct_geral("Diminuiu")`%** relatou redução.
+:::
+
+## Visão geral das associações
+
+:::: {.columns}
+
+::: {.column width="58%"}
+```{r}
+#| label: grafico-cramer
+#| fig-width: 7.2
+#| fig-height: 5.6
+grafico_cramer(res_quali)
+```
+:::
+
+::: {.column width="42%"}
+- **`r length(significativas)` das 15** variáveis qualitativas estão associadas à mudança no consumo de água (p < 0,05).
+- Sem associação: **trabalho** e **fumo**.
+- Todas as associações são de intensidade **desprezível a fraca** (V ≤ `r formatar_num(max(vapply(res_quali, \(r) r$v, 0)), 3)`).
+- As mais intensas: **ansiedade**, **depressão**, **gênero** e **região**.
+:::
+
+::::
+
+## Gênero e raça/cor
+
+```{r}
+tabela_quali(res_quali[c("Genero", "Raca_cor")])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+**Mulheres** relataram mais **redução** no consumo de água (`r pct("Genero", "Feminino", "Diminuiu")`% vs `r pct("Genero", "Masculino", "Diminuiu")`% nos homens). Pessoas **pardas** e **pretas** relataram mais **aumento**; pessoas **brancas**, mais **manutenção**.
+:::
+
+## Região
+
+```{r}
+tabela_quali(res_quali["Regiao"])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. Uma hipótese é a diferença de **clima** entre as regiões. O **Nordeste** também teve mais redução que o esperado.
+:::
+
+## Renda familiar e escolaridade
+
+```{r}
+tabela_quali(res_quali[c("Renda_familiar", "Escolaridade")])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+Renda **acima de R$ 8.640** e **pós-graduação** estão ligadas à **manutenção** do hábito. Pessoas com **até Ensino Médio** relataram mais **redução** (`r pct("Escolaridade", "Até Ensino Médio", "Diminuiu")`% vs `r pct("Escolaridade", "Pós-graduação", "Diminuiu")`% na pós-graduação).
+:::
+
+## Contexto da pandemia
+
+```{r}
+tabela_quali(res_quali[c("Isolamento", "Covid", "Dificuldade_Financeira", "Consulta_Nutricionista")])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+**Isolamento**, **diagnóstico de COVID-19** e **consulta com nutricionista** associam-se a mais **aumento**. **Dificuldade financeira** associa-se a mais **redução** (`r pct("Dificuldade_Financeira", "Sim", "Diminuiu")`% vs `r pct("Dificuldade_Financeira", "Não", "Diminuiu")`%).
+:::
+
+## Saúde emocional
+
+```{r}
+tabela_quali(res_quali[c("Ansiedade", "Depressao", "Insonia", "Enxaqueca")])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+Padrão consistente: quem relatou **ansiedade, depressão, insônia ou enxaqueca** reduziu mais o consumo de água. Exemplo: **depressão**, `r pct("Depressao", "Sim", "Diminuiu")`% vs `r pct("Depressao", "Não", "Diminuiu")`%.
+:::
+
+## Trabalho e fumo
+
+```{r}
+tabela_quali(res_quali[c("Trabalha", "cigarro")])
+```
+
+::: {.legenda-residuo}
+[▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado ajustado\| > 1,96
+:::
+
+::: {.nota}
+Nenhuma das duas variáveis apresentou associação significativa com a mudança no consumo de água (p ≥ 0,05). Por isso as caselas com resíduo > 1,96 não devem ser interpretadas.
+:::
+
+## Variáveis quantitativas
+
+```{r}
+tabela_quanti(res_quanti)
+```
+
+::: {.nota}
+Nenhuma variável teve distribuição normal nos grupos (Shapiro-Wilk, p < 0,05), por isso foi usado o **Kruskal-Wallis**. D = Diminuiu; N = Não alterou; A = Aumentou. Os efeitos são **muito pequenos** (η²<sub>H</sub> < 0,02).
+:::
+
+## Variáveis quantitativas: distribuição
+
+```{r}
+#| label: grafico-boxplots
+#| fig-width: 12
+#| fig-height: 4.6
+grafico_boxplots(dados)
+```
+
+::: {.nota}
+Quem **reduziu** o consumo de água é **mais jovem** (mediana de `r mediana("Idade", "Diminuiu")` anos, contra `r mediana("Idade", "Não alterou")` em *Não alterou* e `r mediana("Idade", "Aumentou")` em *Aumentou*) e tem **peso e IMC um pouco menores**. A altura não difere entre os grupos.
+:::
+
+# Conclusão
+
+## Principais achados
+
+- O objetivo foi avaliar a associação entre a **mudança no consumo de água** e as variáveis explicativas. Quase metade da amostra **aumentou** o consumo.
+- **Redução** do consumo associou-se a **sofrimento emocional** (ansiedade, depressão, insônia, enxaqueca), **dificuldade financeira**, **menor escolaridade**, **gênero feminino** e **menor idade**.
+- **Aumento** associou-se a **isolamento**, **diagnóstico de COVID-19**, **consulta com nutricionista**, região **Norte** e raça/cor **parda/preta**.
+- **Maior renda** e **pós-graduação** associaram-se à **manutenção** do hábito.
+- **Trabalho**, **fumo** e **altura** não se associaram à resposta.
+
+## Interpretação e limitações {.smaller}
+
+- **Interpretações possíveis:** o estresse e a desorganização da rotina podem prejudicar o autocuidado, incluindo a hidratação. Já o acompanhamento nutricional e a própria infecção por COVID-19 podem ter reforçado a orientação de beber mais água. O clima pode explicar parte das diferenças regionais.
+- **Intensidade:** todas as associações são **desprezíveis a fracas**. Com n ≈ 2.150, diferenças pequenas já resultam em p < 0,05.
+- **Limitações:**
+  - amostra de conveniência (online, majoritariamente feminina, do Sudeste e com pós-graduação);
+  - dados autorrelatados;
+  - delineamento transversal;
+  - análises bivariadas, sem controle de confundimento (por exemplo, a diferença de peso pode refletir a maior proporção de mulheres em *Diminuiu*);
+  - múltiplos testes (19).
+- **Próximo passo:** usar um modelo multivariado (por exemplo, regressão logística multinomial) para estimar efeitos ajustados.
+
+## {.center}
+
+<h2 style="text-align:center;">Obrigado!</h2>
+
+<p style="text-align:center;" class="slide-subtitle">Lucas Rodrigo de Moura Aragão</p>
