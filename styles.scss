@@ -30,5 +30,17 @@ $presentation-h2-font-size: 1.38em;
 .reveal .table-slide .gt_table th, .reveal .table-slide .gt_table td { padding-left: 4px; padding-right: 4px; }
 .reveal .quant-slide .gt_table { line-height: 1.1; }
 .reveal .quant-slide .gt_table th, .reveal .quant-slide .gt_table td { padding-left: 7px; padding-right: 7px; }
+.reveal .tabela-compacta, .reveal .tabela-quanti { width: 100%; table-layout: fixed; border-collapse: collapse; line-height: 1.15; margin: 0; }
+.reveal .tabela-compacta th, .reveal .tabela-compacta td { padding: var(--espaco) 3px; border-bottom: 1px solid #dadde0; }
+.reveal .tabela-compacta thead th { font-weight: 700; color: #0d366b; text-align: center; padding-bottom: 7px; }
+.reveal .tabela-compacta thead th:first-child { text-align: left; }
+.reveal .tabela-compacta .variavel th { text-align: left; padding-top: 9px; padding-bottom: 5px; color: #0d366b; background: #f0f3f6; font-weight: 700; }
+.reveal .tabela-compacta td:not(:first-child) { text-align: right; white-space: nowrap; }
+.reveal .tabela-compacta .acima, .reveal .tabela-compacta .abaixo { padding: 1px 2px; }
+.reveal .tabela-compacta sup, .reveal .tabela-quanti sup { font-size: 0.7em; }
+.reveal .tabela-quanti th, .reveal .tabela-quanti td { padding: 8px 5px; border-bottom: 1px solid #dadde0; text-align: right; vertical-align: middle; }
+.reveal .tabela-quanti th:first-child, .reveal .tabela-quanti td:first-child { text-align: left; }
+.reveal .tabela-quanti .quanti-media { background: #f0f3f6; }
+.reveal .tabela-quanti small { font-size: 0.85em; font-weight: 400; }
 .reveal .limites { border-top: 2px solid #b8c9da; margin-top: 0.8em; padding-top: 0.55em; font-size: 0.76em; color: #52514e; }
 .reveal .fechamento { color: #0d366b; font-size: 0.83em; margin-top: 0.8em; }

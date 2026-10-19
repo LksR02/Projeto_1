@@ -59,7 +59,36 @@ p_negrito <- function(p) {
 # bold_p e destaque das caselas influentes pelos resíduos padronizados
 # (> 1,96 com ▲; < -1,96 com ▼). Como no livro, os resíduos só são destacados
 # quando a associação global é significativa.
+tabela_quali_compacta <- function(resultados, fonte = 19, espaco = 3) {
+  escapar <- function(x) as.character(htmltools::htmlEscape(x))
+  cabecalho <- paste0('<colgroup><col style="width:31%">',
+    paste(rep('<col style="width:23%">', 3), collapse=""), '</colgroup>',
+    '<thead><tr><th>Variável / categoria</th>',
+    paste0('<th>', escapar(NIVEIS_RESPOSTA), '</th>', collapse=""), '</tr></thead>')
+  corpo <- vapply(resultados, function(r) {
+    sigla <- if (r$teste == "Qui-quadrado") "Q" else "F"
+    meta <- sprintf('<tr class="variavel"><th colspan="4">%s<sup>%s</sup> · n = %s · p %s · V = %s</th></tr>',
+      escapar(r$rotulo), sigla, formatar_num(r$n, 0), escapar(formatar_p(r$p)), formatar_num(r$v, 3))
+    linhas <- vapply(seq_len(nrow(r$tabela)), function(i) {
+      valores <- vapply(seq_len(ncol(r$tabela)), function(j) {
+        texto <- escapar(r$celulas[i,j])
+        z <- r$residuos[i,j]
+        if (r$p < ALFA && abs(z) > LIMIAR_RESIDUO) {
+          texto <- sprintf('<span class="%s">%s %s</span>',
+            if (z > 0) "acima" else "abaixo", if (z > 0) "▲" else "▼", texto)
+        }
+        paste0('<td>', texto, '</td>')
+      }, "")
+      paste0('<tr><td>', escapar(rownames(r$tabela)[i]), '</td>', paste(valores,collapse=""), '</tr>')
+    }, "")
+    paste0(meta, paste(linhas, collapse=""))
+  }, "")
+  knitr::asis_output(sprintf('<table class="tabela-compacta" style="font-size:%spx;--espaco:%spx">%s<tbody>%s</tbody></table>',
+    fonte, espaco, cabecalho, paste(corpo,collapse="")))
+}
+
 tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco = 3) {
+  if (compacta) return(tabela_quali_compacta(resultados, fonte, espaco))
   vars <- names(resultados)
   siglas <- vapply(resultados, \(r) if (r$teste == "Qui-quadrado") "Q" else "F", "")
   # o n aparece no rótulo só quando há não resposta (n menor que o total)
@@ -198,7 +227,7 @@ tabela_diagnosticos <- function(resultados) {
 # Tabela resumo das quantitativas como no livro: tbl_summary com média (DP),
 # add_p com oneway.test (var.equal = TRUE -> ANOVA "A"; FALSE -> Welch "W"),
 # η² e letras das comparações múltiplas (Tukey após ANOVA; Games-Howell após Welch).
-tabela_quanti <- function(resultados, dados, fonte = 20) {
+tabela_quanti_completa <- function(resultados, dados, fonte = 20) {
   vars <- names(resultados)
   rotulos <- lapply(resultados, \(r) sprintf("%s<sup>%s</sup>", r$rotulo, r$sigla))
   argumentos <- lapply(resultados, \(r) list(var.equal = r$teste == "ANOVA"))
@@ -251,6 +280,39 @@ tabela_quanti <- function(resultados, dados, fonte = 20) {
     as_gt() |>
     fmt_markdown(columns = c(label, `**Comparações Múltiplas**`)) |>
     estilo_gt(fonte = fonte, espaco = 2)
+}
+
+# Mesmos resultados da rotina analítica, com letras junto às médias e duas
+# medidas por variável. A disposição evita colunas cortadas em 10 slides.
+tabela_quanti <- function(resultados, dados, fonte = 20) {
+  escapar <- function(x) as.character(htmltools::htmlEscape(x))
+  ns <- table(dados$Consumo_agua)
+  cabecalho <- paste0('<colgroup><col style="width:23%">',
+    paste(rep('<col style="width:21%">',3),collapse=""),
+    '<col style="width:8%"><col style="width:6%"></colgroup>',
+    '<thead><tr><th>Variável / medida</th>',
+    paste0('<th>', escapar(NIVEIS_RESPOSTA), '<br><small>n = ',
+      formatar_num(as.numeric(ns[NIVEIS_RESPOSTA]),0), '</small></th>',collapse=""),
+    '<th>p</th><th>η²</th></tr></thead>')
+  linhas <- vapply(resultados, function(r) {
+    valores <- vapply(NIVEIS_RESPOSTA, function(g) {
+      s <- r$resumo[r$resumo$Consumo_agua == g, ]
+      dig <- if (r$variavel == "Altura") 2 else 1
+      letra <- if (r$p < ALFA) paste0('<sup>',r$letras[[g]],'</sup>') else ''
+      sprintf('<td>%s (%s)%s</td>', formatar_num(s$media,dig), formatar_num(s$dp,dig), letra)
+    }, "")
+    medianas <- vapply(NIVEIS_RESPOSTA, function(g) {
+      s <- r$resumo[r$resumo$Consumo_agua == g, ]
+      dig <- if (r$variavel == "Altura") 2 else 1
+      sprintf('<td>%s [%s; %s]</td>',formatar_num(s$mediana,dig),formatar_num(s$q1,dig),formatar_num(s$q3,dig))
+    }, "")
+    paste0('<tr class="quanti-media"><th>',escapar(r$rotulo),'<sup>',r$sigla,
+      '</sup><br><small>Média (DP)</small></th>',paste(valores,collapse=""),
+      '<td>',escapar(formatar_p(r$p)),'</td><td>',formatar_num(r$eta2,3),'</td></tr>',
+      '<tr><td>Mediana [Q1; Q3]</td>',paste(medianas,collapse=""),'<td></td><td></td></tr>')
+  }, "")
+  knitr::asis_output(sprintf('<table class="tabela-quanti" style="font-size:%spx">%s<tbody>%s</tbody></table>',
+    fonte,cabecalho,paste(linhas,collapse="")))
 }
 
 # Gráficos ----------------------------------------------------------------------
