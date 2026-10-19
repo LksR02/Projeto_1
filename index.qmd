@@ -1,21 +1,22 @@
 ---
-title: "Mudanças no consumo de água durante a pandemia de COVID-19"
-subtitle: "PROJETO I — fatores associados à variável resposta `Consumo_água`"
+title: ""
+pagetitle: "Mudanças no consumo de água durante a pandemia de COVID-19"
 author: "Lucas Rodrigo de Moura Aragão"
 institute: "Universidade Federal Fluminense"
-date: today
-date-format: "DD/MM/YYYY"
+lang: pt-BR
 format:
   revealjs:
     theme: [default, styles.scss]
-    slide-number: true
+    slide-level: 2
+    slide-number: c/t
     incremental: false
     embed-resources: true
     transition: none
     width: 1280
     height: 720
-    margin: 0.07
+    margin: 0.06
     fig-dpi: 150
+    auto-stretch: false
 execute:
   echo: false
   warning: false
@@ -24,463 +25,340 @@ execute:
 
 ```{r}
 #| label: setup
+if (dir.exists("data/r-library")) .libPaths(c(normalizePath("data/r-library"), .libPaths()))
 source("R/funcoes.R")
 source("R/apresentacao.R")
-
 dados <- ler_dados("data/Nutricao.xlsx")
-
 res_quali <- setNames(lapply(VARS_QUALI, \(v) analisar_quali(dados, v)), VARS_QUALI)
 res_quanti <- setNames(lapply(VARS_QUANTI, \(v) analisar_quanti(dados, v)), VARS_QUANTI)
-
-# % (na linha) de uma resposta dentro de uma categoria de uma explicativa
+ROTULOS <- c(ROTULOS, Frutas = "Mudança no consumo de frutas")
+dados$Frutas <- factor(dados$Frutas, levels = NIVEIS_RESPOSTA)
+res_frutas <- list(Frutas = analisar_quali(dados, "Frutas"))
+n_total <- nrow(dados)
+n_testes <- length(res_quali) + length(res_quanti)
+alfa_bonf <- ALFA / n_testes
 pct <- function(var, categoria, resposta) {
   formatar_num(100 * prop.table(res_quali[[var]]$tabela, 1)[categoria, resposta], 1)
 }
-pct_geral <- function(resposta) {
-  formatar_num(100 * mean(dados$Consumo_agua == resposta), 1)
-}
-media <- function(var, resposta) {
+media <- function(var, grupo) {
   r <- res_quanti[[var]]$resumo
-  formatar_num(r$media[r$Consumo_agua == resposta], 1)
+  formatar_num(r$media[r$Consumo_agua == grupo], 1)
 }
-
-n_total <- nrow(dados)
-significativas <- names(res_quali)[vapply(res_quali, \(r) r$p < ALFA, logical(1))]
-nao_significativas <- setdiff(names(res_quali), significativas)
-fracas <- names(res_quali)[vapply(res_quali, \(r) r$intensidade == "Fraca", logical(1))]
-todas_qui <- all(vapply(res_quali, \(r) r$teste == "Qui-quadrado", logical(1)))
-quanti_sig <- names(res_quanti)[vapply(res_quanti, \(r) r$p < ALFA, logical(1))]
-legenda_testes <- if (todas_qui) "<sup>Q</sup> qui-quadrado" else "<sup>Q</sup> qui-quadrado · <sup>F</sup> exato de Fisher"
-
-# Correção de Bonferroni para os 19 testes (15 qualitativas + 4 quantitativas)
-n_testes <- length(res_quali) + length(res_quanti)
-alfa_bonf <- ALFA / n_testes
-p_todos <- c(vapply(res_quali, \(r) r$p, 0), vapply(res_quanti, \(r) r$p, 0))
-robustas <- names(p_todos)[p_todos < alfa_bonf]
-frageis <- names(p_todos)[p_todos < ALFA & p_todos >= alfa_bonf]
-
-rotulos_de <- function(vars) {
-  x <- sub("covid", "COVID", tolower(sub(" \\(.*\\)$", "", unname(ROTULOS[vars]))))
-  if (length(x) <= 1) return(x)
-  paste(paste(head(x, -1), collapse = ", "), "e", tail(x, 1))
+legenda <- function() {
+  knitr::asis_output('<div class="legenda-residuo">n (% na linha) · <b>Q</b> qui-quadrado · <b>F</b> Fisher por Monte Carlo · <b>V</b> de Cramér · <span class="acima">▲ acima</span> / <span class="abaixo">▼ abaixo do esperado</span> (|resíduo| &gt; 1,96 e p &lt; 0,05)</div>')
 }
 ```
 
-# Introdução
+## Pandemia, rotina e consumo de água {#introducao}
 
-## Contexto
-
-- A pandemia de COVID-19 alterou a rotina da população: **isolamento social**, trabalho remoto, perda de renda e insegurança econômica.
-- Houve também impacto sobre a **saúde mental**: ansiedade, depressão e insônia foram relatadas com mais frequência.
-- Essas mudanças se refletiram nos **hábitos alimentares**: tempo em casa, preparo de refeições, delivery e consumo de diferentes alimentos.
-- A **hidratação** é parte essencial de uma alimentação saudável, mas pode ser afetada pela rotina, pelo estresse e pelas condições econômicas.
-
-::: {.nota}
-Referências: Malta et al. (2020). A pandemia da COVID-19 e as mudanças no estilo de vida dos brasileiros adultos. *Epidemiologia e Serviços de Saúde*, 29(4). · Barros et al. (2020). Relato de tristeza/depressão, nervosismo/ansiedade e problemas de sono na população adulta brasileira durante a pandemia de COVID-19. *Epidemiologia e Serviços de Saúde*, 29(4).
+::: {.autoria}
+PROJETO I · Lucas Rodrigo de Moura Aragão · UFF
 :::
 
-## Problema de pesquisa
+- **Social:** distanciamento e mudanças no convívio.
+- **Econômico:** mudanças no trabalho e dificuldades financeiras.
+- **Comportamental:** reorganização da alimentação e do autocuidado.
 
-::: {.box-blue}
-**Variável resposta (sorteada):** `Consumo_água` — mudança no consumo de água durante a pandemia, com as categorias *Diminuiu*, *Não alterou* e *Aumentou*.
+::: {.pergunta}
+**A mudança no consumo de água se associa às características dos participantes?**
 :::
 
-<br>
+**Objetivo:** avaliar essa associação e identificar os perfis que se destacam na amostra.
 
-- **Pergunta central:** *a distribuição da mudança no consumo de água depende das características dos participantes, ou elas ocorrem de forma independente?*
-- **Por que investigar?** Identificar grupos com maior propensão a **reduzir** a ingestão de água ajuda a orientar ações de educação alimentar e nutricional.
+::: {.fonte}
+Contexto: OMS (2020), estratégia de resposta à COVID-19; Malta et al. (2020), mudanças no estilo de vida dos brasileiros.
+:::
 
-## Objetivos
+::: {.notes}
+Tempo: 1 minuto. Acumulado: 1:00.
 
-**Objetivo principal**
+Durante a pandemia de COVID-19, medidas de distanciamento foram adotadas para reduzir a transmissão do vírus. Nesse período, muitas pessoas enfrentaram mudanças no convívio, no trabalho e nas condições financeiras. A alimentação e o autocuidado também passaram a acontecer em outra rotina. Neste projeto, meu foco é a mudança no consumo de água: quero investigar como ela se associa às características dos participantes. As demais variáveis ajudam a compreender os perfis envolvidos.
 
-- Avaliar a associação entre a mudança no consumo de água (`Consumo_água`) e as variáveis explicativas do banco de dados.
+Não usar a popularização de garrafas ou estimativas de trabalho presencial como evidência: essas informações não estão no banco. As possíveis explicações são hipóteses, não conclusões causais.
 
-**Objetivos específicos**
+Referências de contexto: OMS, COVID-19 Strategy Update, 14/04/2020, https://www.who.int/docs/default-source/coronaviruse/COVID-strategy-update-14april2020.pdf. Malta et al. (2020), A pandemia da COVID-19 e as mudanças no estilo de vida dos brasileiros adultos, Epidemiologia e Serviços de Saúde, 29(4).
+:::
 
-- Descrever o padrão de mudança no consumo de água na amostra;
-- Verificar diferenças segundo características **sociodemográficas e econômicas**;
-- Avaliar o papel do **contexto da pandemia** e da **saúde emocional**;
-- Comparar as **médias de idade, peso, altura e IMC** entre as categorias da resposta.
-
-# Metodologia
-
-## Dados e variáveis
-
-- **Origem:** questionário online aplicado em **2022**, durante a pandemia de COVID-19, por alunas da pós-graduação em Nutrição da UFF.
-- **Amostra:** **`r formatar_num(n_total, 0)` adultos**, sem dados faltantes no banco original.
-- **Variável resposta:** `Consumo_água` (qualitativa ordinal: Diminuiu, Não alterou, Aumentou).
-- **Variáveis explicativas:**
-  - **15 qualitativas:** gênero, raça/cor, região, isolamento, trabalho, renda familiar, escolaridade, diagnóstico de COVID-19, consulta com nutricionista, dificuldade financeira, fumo, ansiedade, depressão, insônia e enxaqueca;
-  - **4 quantitativas:** idade, peso, altura e IMC.
-  - O banco **não possui variável aberta** (texto livre); por isso a nuvem de palavras não se aplica.
-
-## Preparação dos dados
-
-- Respostas **"Prefiro não responder/declarar"** e **"Não desejo informar"** foram tratadas como não resposta e excluídas apenas da análise da variável correspondente.
-- Categorias raras (por exemplo, gênero "Outro", n = 6; raça/cor Indígena, n = 9) foram **mantidas**: quando geram frequências esperadas baixas, usamos o **teste exato de Fisher**.
-- Só a **Escolaridade** foi agregada, porque é uma escala ordenada e o grupo tem **sentido substantivo**: Analfabeto + Ens. Fundamental + Ens. Médio → **Até Ensino Médio** (n = 748).
-- Assim, o n de cada análise varia de `r formatar_num(min(vapply(res_quali, \(r) r$n, 0)), 0)` a `r formatar_num(n_total, 0)`.
-
-## Roteiro de análise: variáveis qualitativas
+## Dados e variáveis {#dados}
 
 :::: {.columns}
+::: {.column width="48%"}
+### Questionário online · 2022
 
-::: {.column width="55%"}
-::: {.box-blue}
-**1. Frequências esperadas:** E = (total da linha × total da coluna) / total geral. Regra de Cochran: nenhuma E < 1 e no máximo 20% das caselas com E < 5.
-:::
-::: {.etapa}
-↓ atendida: **qui-quadrado** · não atendida: **exato de Fisher**
-:::
-::: {.box-blue}
-**2. Teste de independência** (uma amostra, duas variáveis): H₀: as variáveis são independentes. Rejeita-se H₀ se valor-p ≤ 5%.
-:::
-::: {.etapa}
-↓ o teste diz *se* há associação, mas não *onde*
-:::
-::: {.box-blue}
-**3. Resíduos padronizados:** caselas com |r| > 1,96 são **combinações influentes**.
-:::
-::: {.box-blue}
-**4. V de Cramér** — mede a **intensidade** da associação.
-:::
-:::
+**`r formatar_num(n_total, 0)` adultos** · pós-graduação em Nutrição da UFF.
 
-::: {.column width="45%"}
-```{r}
-tibble(
-  `V de Cramér` = c("0,00 a 0,10", "0,10 a 0,30", "0,30 a 0,50", "acima de 0,50"),
-  Intensidade = c("Muito fraca", "Fraca", "Moderada", "Forte")
-) |>
-  kbl(format = "html", align = c("c", "l")) |>
-  kable_styling(bootstrap_options = "condensed", full_width = FALSE)
-```
+Amostra de **conveniência**; respostas autorrelatadas.
 
-::: {.nota}
-O V de Cramér não depende das suposições do qui-quadrado e pode ser usado também depois do teste de Fisher.
+**Resposta principal:** mudança no consumo de água.
 
-**Suposições:** observações independentes (cada participante conta uma vez) e amostra representativa, que **não é garantida** aqui (amostra de conveniência; ver limitações).
-
-**Pacotes do R:** `readxl` e `dplyr` (dados), `gtsummary` (tabelas), `rstatix` (V de Cramér, Games-Howell), `car` (Levene), `qqplotr` e `ggplot2` (gráficos); slides em **Quarto**.
+**Diminuiu · Não alterou · Aumentou**
 :::
-:::
+::: {.column width="52%"}
+### Características comparadas
 
+**15 qualitativas:** perfil social e econômico, contexto da pandemia e relatos emocionais.
+
+**4 quantitativas:** idade, peso, altura e IMC.
+
+**Preparação:** recusas excluídas apenas da variável correspondente; escolaridade agrupada em três níveis; categorias raras mantidas.
+:::
 ::::
 
-## Roteiro de análise: variáveis quantitativas
+::: {.takeaway}
+A resposta mede **mudança percebida**. Não informa litros ingeridos nem adequação da hidratação.
+:::
+
+::: {.notes}
+Tempo: 1 minuto. Acumulado: 2:00.
+
+Em 2022 foi aplicado um questionário online sobre hábitos durante a pandemia, respondido por 2.155 adultos. A variável resposta é a mudança de água, com três categorias. As explicativas são características com as quais vamos compará-la, como idade, renda e isolamento. Há 15 qualitativas e quatro quantitativas. Não precisamos decorar a lista: ela será mostrada nas tabelas. Por ser uma amostra de conveniência online, não podemos presumir que represente todos os brasileiros.
+
+Preparação, caso o professor pergunte: não havia células vazias no original; as recusas de gênero (5), raça/cor (28) e escolaridade (17) foram tratadas como não resposta apenas nos respectivos cruzamentos. Analfabeto (2), Fundamental (4) e Médio (742) foram agrupados como Até Ensino Médio (748), com justificativa substantiva. O n válido varia de 2.127 a 2.155. Categorias raras foram preservadas. As respostas Não consumo e Não tenho o hábito em outros desfechos são válidas, não exclusões automáticas. Não há variável aberta para nuvem de palavras. Há 17 linhas idênticas, mantidas por ausência de identificador que comprove duplicação de participantes.
+:::
+
+## Métodos estatísticos {#metodos}
 
 :::: {.columns}
+::: {.column width="50%"}
+### Qualitativas × água
 
-::: {.column width="55%"}
-::: {.box-purple}
-**1. Normalidade por grupo** — gráfico de densidade, Q-Q plot e teste de Shapiro-Wilk. Com **n ≥ 30 em todos os grupos**, o **Teorema Central do Limite** torna aproximadamente normal a distribuição das médias.
+- **Qui-quadrado** de independência.
+- **Fisher** quando as frequências esperadas são pequenas.
+- **Resíduos padronizados:** onde estão os desvios.
+- **V de Cramér:** intensidade da associação.
 :::
-::: {.box-purple}
-**2. Homocedasticidade** — **Bartlett** se os dados forem normais; **Levene** se não forem.
-:::
-::: {.etapa}
-↓ variâncias homogêneas · variâncias heterogêneas
-:::
-::: {.box-purple}
-**3a. ANOVA** + comparações múltiplas de **Tukey**<br>
-**3b. ANOVA de Welch** + comparações múltiplas de **Games-Howell**
-:::
-:::
+::: {.column width="50%"}
+### Quantitativas nos três grupos
 
-::: {.column width="45%"}
-::: {.nota}
-- **ANOVA de Welch:** não assume variâncias iguais; Games-Howell adapta o Tukey com variâncias próprias de cada par.
-- **η²:** proporção da variabilidade explicada pelos grupos (≈ 0,01 pequeno; 0,06 médio; 0,14 grande).
-- **Letras:** grupos com a mesma letra não diferem.
-- **Significância:** 5%. Como são `r n_testes` testes, indicamos também quem resiste à correção de **Bonferroni** (α = 0,05/`r n_testes` ≈ `r formatar_num(alfa_bonf, 4)`).
+- **Densidade, Q-Q e Shapiro–Wilk:** normalidade por grupo.
+- **Levene:** comparação das variâncias.
+- **Idade:** Welch + Games–Howell.
+- **Peso, altura e IMC:** ANOVA + Tukey.
 :::
-:::
-
 ::::
 
-# Resultados
+::: {.nota}
+**Significância: 5%.** Grupos independentes; amostra grande favorece a aproximação das médias pelo TCL. Verificação adicional: Bonferroni para `r n_testes` testes (α ≈ `r formatar_num(alfa_bonf, 4)`). V: &lt; 0,10 muito fraca; 0,10–0,30 fraca.
+:::
 
-## Distribuição da variável resposta
+::: {.fonte}
+R: readxl, dplyr, rstatix, car, ggplot2, qqplotr, gtsummary e gt · slides em Quarto.
+:::
 
+::: {.notes}
+Tempo: 1 minuto e 30 segundos. Acumulado: 3:30.
+
+Para duas variáveis qualitativas, investigamos se são independentes. O qui-quadrado faz essa comparação quando as frequências esperadas são adequadas; caso contrário usamos Fisher. O valor-p indica evidência de associação, os resíduos localizam as combinações que se destacam e o V de Cramér mede a intensidade.
+
+Para as quantitativas, comparamos as médias entre quem diminuiu, manteve e aumentou água. Avaliamos normalidade e igualdade de variâncias. Para idade, as variâncias diferiram e usamos Welch, seguido de Games–Howell. Para as demais, usamos ANOVA e Tukey. Adotamos 5% e mostramos também uma verificação mais conservadora com Bonferroni.
+
+Detalhes para perguntas: regra de Cochran = nenhuma esperada < 1 e no máximo 20% das caselas com esperada < 5. Gênero e raça/cor usam Fisher com 100.000 simulações e semente 2026. Os resíduos em categorias raras são apenas pistas exploratórias; o limiar 1,96 não corrige multiplicidade entre caselas. Shapiro rejeitou normalidade em todos os grupos; o TCL trata das médias, sem transformar os dados em normais. Menor grupo: 273. Levene: idade < 0,001; peso 0,987; altura 0,467; IMC 0,431. Bartlett seria uma opção sob normalidade, mas não foi a decisão deste banco. Bonferroni entre os 19 testes globais é uma verificação adicional do mesmo princípio de ajuste, não uma exigência textual da atividade. Amostra de conveniência e possível dependência não são corrigidas pelo tamanho amostral.
+:::
+
+## Quase metade relatou aumento {#distribuicao}
+
+:::: {.columns}
+::: {.column width="62%"}
 ```{r}
 #| label: grafico-resposta
-#| fig-width: 9
-#| fig-height: 4.6
-#| fig-align: center
+#| fig-width: 7.2
+#| fig-height: 4.7
+#| out-width: 100%
 grafico_resposta(dados)
 ```
-
-::: {.nota}
-Quase metade dos participantes (**`r pct_geral("Aumentou")`%**) relatou **aumento** no consumo de água durante a pandemia; apenas **`r pct_geral("Diminuiu")`%** relatou redução.
 :::
+::: {.column width="38%"}
+### Visão geral
 
-## Visão geral das associações {.smaller}
+**13 das 15** qualitativas: p &lt; 0,05.
 
-:::: {.columns}
+Associações **fracas ou muito fracas**.
 
-::: {.column width="58%"}
-```{r}
-#| label: grafico-cramer
-#| fig-width: 7.2
-#| fig-height: 5.6
-grafico_cramer(res_quali)
-```
+**Trabalho e fumo:** sem evidência estatística suficiente.
+
+Valor-p baixo não significa associação intensa.
 :::
-
-::: {.column width="42%"}
-- **`r length(significativas)` das 15** variáveis qualitativas estão associadas à mudança no consumo de água (p < 0,05).
-- Sem associação: **trabalho** e **fumo**.
-- Intensidade **fraca** para `r rotulos_de(fracas)`; **muito fraca** para as demais.
-- Com n ≈ 2.150, até associações fracas resultam em p < 0,05: por isso o **V de Cramér** é indispensável.
-- Não resistem à correção de Bonferroni: `r rotulos_de(intersect(frageis, VARS_QUALI))`.
-:::
-
 ::::
 
-## Gênero e raça/cor
+::: {.notes}
+Tempo: 45 segundos. Acumulado: 4:15.
+
+Na amostra, 1.049 pessoas aumentaram o consumo de água, 833 não alteraram e 273 diminuíram. O aumento representa 48,7% e a redução 12,7%. Entre as 15 explicativas qualitativas, 13 tiveram associação nominal a 5%, mas todas as intensidades foram fracas ou muito fracas. Trabalho e fumo não atingiram o nível adotado. Isso orienta a leitura das próximas tabelas: precisamos observar os percentuais e a intensidade, não apenas contar quantos valores-p são baixos.
+
+Percentuais arredondados podem somar 100,1%. Ausência de significância não prova ausência de associação.
+:::
+
+## Perfil sociodemográfico {#perfil .table-slide}
+
+:::: {.columns}
+::: {.column width="57%"}
+```{r}
+tabela_quali(res_quali[c("Genero", "Raca_cor")], dados,
+             compacta = TRUE, fonte = 18, espaco = 2)
+```
+:::
+::: {.column width="43%"}
+```{r}
+tabela_quali(res_quali["Regiao"], dados,
+             compacta = TRUE, fonte = 18, espaco = 2)
+```
+
+::: {.leitura}
+**Redução:** mulheres `r pct("Genero", "Feminino", "Diminuiu")`%; homens `r pct("Genero", "Masculino", "Diminuiu")`%.
+
+**Aumento:** Norte `r pct("Regiao", "Norte", "Aumentou")`%; Sul `r pct("Regiao", "Sul", "Aumentou")`%.
+:::
+:::
+::::
 
 ```{r}
-tabela_quali(res_quali[c("Genero", "Raca_cor")], dados)
+legenda()
+```
+
+::: {.notes}
+Tempo: 1 minuto e 15 segundos. Acumulado: 5:30.
+
+Estas tabelas mostram contagens e percentuais por linha. Entre as mulheres, 14,7% relataram redução; entre os homens, 6,5%. A associação é muito fraca. Na região Norte, 59,7% aumentaram água, contra 37,1% no Sul; o V regional é 0,108, ainda fraco. A raça/cor também apresentou associação nominal: pardos e pretos tiveram aumento acima do esperado, enquanto brancos tiveram mais manutenção. Porém, raça/cor não atinge o limite de Bonferroni. As categorias pequenas foram mantidas com Fisher; não permitem uma interpretação estável de seus percentuais isolados.
+
+Não atribuir diferenças regionais ao clima: ele não foi medido. Também há diferenças de composição social da amostra. Gênero e região permanecem após Bonferroni. Os destaques nas caselas são baseados no teste global nominal e nos resíduos, não no ajuste dos 19 testes.
+:::
+
+## Condições econômicas e contexto da pandemia {#contexto .table-slide}
+
+:::: {.columns}
+::: {.column width="50%"}
+```{r}
+tabela_quali(res_quali[c("Renda_familiar", "Escolaridade", "Dificuldade_Financeira")],
+             dados, compacta = TRUE, fonte = 18, espaco = 2)
+```
+:::
+::: {.column width="50%"}
+```{r}
+tabela_quali(res_quali[c("Isolamento", "Covid", "Consulta_Nutricionista")],
+             dados, compacta = TRUE, fonte = 18, espaco = 2)
+```
+:::
+::::
+
+```{r}
+legenda()
+```
+
+::: {.takeaway}
+**Dificuldade financeira:** redução em `r pct("Dificuldade_Financeira", "Sim", "Diminuiu")`% com relato e `r pct("Dificuldade_Financeira", "Não", "Diminuiu")`% sem relato. Consulta com nutricionista associa-se a mais aumento.
+:::
+
+::: {.notes}
+Tempo: 1 minuto e 15 segundos. Acumulado: 6:45.
+
+Vou destacar duas comparações. Entre quem relatou dificuldade financeira, 17,5% diminuíram água, contra 11,6% dos demais. Entre quem consultou nutricionista, 56,1% aumentaram água, contra 46,9% sem consulta. Ambas as associações são muito fracas, mas permanecem no ajuste principal. A menor escolaridade se associou a mais redução, enquanto pós-graduação se associou à manutenção. Maior renda também apresentou mais manutenção. Isolamento e diagnóstico de COVID se associaram nominalmente a mais aumento. Renda, isolamento e COVID não atingem o limite de Bonferroni.
+
+As características não são independentes entre si: na investigação complementar, renda e dificuldade financeira têm V = 0,348; as idades médias diferem muito segundo escolaridade. Esses cruzamentos não controlam confundimento. Não dizer que consulta causou aumento, que renda mede acesso à água ou que isolamento significa trabalho remoto. O desenho não estabelece essas conclusões.
+:::
+
+## Saúde emocional, trabalho e fumo {#emocional .table-slide}
+
+:::: {.columns}
+::: {.column width="63%"}
+```{r}
+tabela_quali(res_quali[c("Ansiedade", "Depressao", "Insonia", "Enxaqueca")],
+             dados, compacta = TRUE, fonte = 19, espaco = 2)
+```
+:::
+::: {.column width="37%"}
+```{r}
+tabela_quali(res_quali[c("Trabalha", "cigarro")],
+             dados, compacta = TRUE, fonte = 18, espaco = 2)
+```
+
+::: {.leitura}
+**Depressão e redução:** `r pct("Depressao", "Sim", "Diminuiu")`% com relato; `r pct("Depressao", "Não", "Diminuiu")`% sem relato.
+
+Trabalho e fumo: **p ≥ 0,05**.
+:::
+:::
+::::
+
+```{r}
+legenda()
+```
+
+::: {.notes}
+Tempo: 1 minuto e 15 segundos. Acumulado: 8:00.
+
+Os relatos emocionais apresentam um padrão de maior redução de água. Por exemplo, entre quem relatou depressão, 21,2% reduziram, contra 11,0% sem esse relato. Ansiedade apresentou o maior V entre as explicativas qualitativas, de 0,138, ainda uma associação fraca. Ansiedade, depressão e insônia permanecem após Bonferroni; enxaqueca não. Trabalho e fumo não apresentaram evidência global suficiente, por isso não destacamos resíduos nessas tabelas.
+
+São relatos autorreferidos, não diagnósticos clínicos documentados. Também existe sobreposição: na investigação complementar, 27,2% de quem relatou ansiedade também relatou depressão, contra 5,9% dos demais. Não somar os grupos como pessoas distintas e não atribuir direção causal. A hipótese de rotina e autocuidado ajuda a discutir, mas não foi testada como mecanismo.
+:::
+
+## Idade e medidas antropométricas {#quantitativas .quant-slide}
+
+```{r}
+tabela_quanti(res_quanti, dados, fonte = 20)
 ```
 
 ::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
+A = ANOVA + Tukey · W = Welch + Games–Howell · letras compartilhadas: diferença não detectada no pós-teste (5%).
 :::
 
-::: {.nota}
-Com categorias raras (gênero "Outro", raça/cor Amarela, Indígena e Outro), a regra de Cochran não é atendida e usamos o **exato de Fisher**. **Mulheres** relataram mais **redução** (`r pct("Genero", "Feminino", "Diminuiu")`% vs `r pct("Genero", "Masculino", "Diminuiu")`% nos homens). Pessoas **pardas** e **pretas** relataram mais **aumento**; **brancas**, mais **manutenção**.
+::: {.takeaway}
+**Idade média:** Diminuiu `r media("Idade", "Diminuiu")` &lt; Aumentou `r media("Idade", "Aumentou")` &lt; Não alterou `r media("Idade", "Não alterou")` anos. Peso não resiste ao Bonferroni; altura e IMC sem evidência de diferença.
 :::
 
-## Região
+::: {.notes}
+Tempo: 1 minuto. Acumulado: 9:00.
+
+A idade média foi 31,3 anos em quem diminuiu, 34,5 em quem aumentou e 36,4 em quem manteve. As três médias diferem entre si, indicadas pelas letras, com efeito pequeno: eta quadrado 0,016. O grupo que diminuiu também teve peso médio menor, mas a diferença é pequena, com eta quadrado 0,004, e não permanece após Bonferroni. Para altura e IMC não encontramos evidência suficiente de diferença.
+
+Peso não mede emagrecimento na pandemia. A maior proporção de mulheres no grupo Diminuiu pode contribuir para a diferença de peso: 86,4% contra aproximadamente 73% nos outros grupos. Isso é uma hipótese de confundimento, não ajuste nem explicação demonstrada. Letras iguais não provam igualdade. A medida eta quadrado é descritiva da variabilidade entre grupos; não significa proporção causada pelo consumo de água.
+:::
+
+## Água e outros hábitos {#outros-habitos}
+
+::: {.subtitulo}
+Análise exploratória complementar · outros desfechos do banco
+:::
 
 ```{r}
-tabela_quali(res_quali["Regiao"], dados)
+tabela_quali(res_frutas, dados, compacta = TRUE, fonte = 25, espaco = 6)
 ```
-
-::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
-:::
-
-::: {.nota}
-No **Norte**, `r pct("Regiao", "Norte", "Aumentou")`% aumentaram o consumo de água, contra `r pct("Regiao", "Sul", "Aumentou")`% no **Sul**, onde manutenção e redução foram mais frequentes. O **Nordeste**, também quente, teve mais **redução** que o esperado. O clima não foi medido e, sozinho, não explica o padrão; diferenças de renda, rotina e perfil da amostra em cada região são outras hipóteses.
-:::
-
-## Renda familiar e escolaridade
 
 ```{r}
-tabela_quali(res_quali[c("Renda_familiar", "Escolaridade")], dados)
+legenda()
 ```
 
-::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
+- Entre quem **aumentou frutas**, **61,8% aumentaram água**.
+- Entre quem **diminuiu frutas**, **26,7% diminuíram água**.
+- V = **`r formatar_num(res_frutas$Frutas$v, 3)`**: mudanças relacionadas, com intensidade **fraca**.
+
+::: {.notes}
+Tempo: 1 minuto. Acumulado: 10:00.
+
+Como contexto complementar, investiguei a relação entre água e outros hábitos. O exemplo mais claro é frutas. Entre quem aumentou frutas, 61,8% também aumentaram água. Entre quem diminuiu frutas, 26,7% diminuíram água. O V é 0,214, uma associação fraca pela classificação do curso. Isso é compatível com mudanças concomitantes nos hábitos; não demonstra que consumir frutas fez alguém beber mais água.
+
+Frutas é outro desfecho do banco, não uma das explicativas originalmente definidas para o projeto. Este exemplo foi escolhido na exploração de 18 outros hábitos; não é uma hipótese confirmatória pré-registrada. Sua associação permanece também sob Bonferroni da família de 18 (p ajustado < 0,001). Não foram usados modelos novos; aplicou-se o mesmo roteiro de qui-quadrado, resíduos e V de Cramér. O material completo de estudo conserva os demais cruzamentos e diagnósticos sem acrescentar slides à apresentação.
 :::
 
-::: {.nota}
-Renda **acima de R$ 8.640** e **pós-graduação** estão ligadas à **manutenção** do hábito. Pessoas com **até Ensino Médio** relataram mais **redução** (`r pct("Escolaridade", "Até Ensino Médio", "Diminuiu")`% vs `r pct("Escolaridade", "Pós-graduação", "Diminuiu")`% na pós-graduação).
+## Conclusão e limites {#conclusao}
+
+- **Resultado geral:** quase metade relatou aumento de água.
+- **Perfis de redução:** relatos emocionais, dificuldade financeira e menor idade se destacaram.
+- **Intensidade:** associações fracas ou muito fracas; significância não equivale a grande efeito.
+
+::: {.limites}
+**Amostra de conveniência · autorrelato · análises bivariadas**
+
+Os resultados descrevem associações nesta amostra. Não demonstram causalidade nem controlam outras características simultaneamente.
 :::
 
-## Contexto da pandemia
-
-```{r}
-tabela_quali(res_quali[c("Isolamento", "Covid", "Dificuldade_Financeira", "Consulta_Nutricionista")], dados)
-```
-
-::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
+::: {.fechamento}
+**Contribuição:** sugerir perfis a observar em ações de promoção da hidratação em situações de crise.
 :::
 
-::: {.nota}
-**Isolamento**, **diagnóstico de COVID-19** e **consulta com nutricionista** associam-se a mais **aumento**. **Dificuldade financeira** associa-se a mais **redução** (`r pct("Dificuldade_Financeira", "Sim", "Diminuiu")`% vs `r pct("Dificuldade_Financeira", "Não", "Diminuiu")`%).
-:::
+::: {.notes}
+Tempo: 1 minuto. Acumulado: 11:00. Margem até o limite: 1 minuto.
 
-## Saúde emocional
+Retomando o objetivo, encontramos associações entre a mudança de água e várias características dos participantes. Os relatos emocionais, a dificuldade financeira e a idade merecem destaque, mas as magnitudes são pequenas. A amostra de conveniência e os dados autorrelatados limitam a generalização, e os cruzamentos não estabelecem causa nem controlam confundimento. A contribuição é indicar perfis para atenção e investigação em ações de promoção da hidratação. Obrigado.
 
-```{r}
-tabela_quali(res_quali[c("Ansiedade", "Depressao", "Insonia", "Enxaqueca")], dados)
-```
-
-::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
-:::
-
-::: {.nota}
-Padrão consistente: quem relatou **ansiedade, depressão, insônia ou enxaqueca** reduziu mais o consumo de água. Exemplo: **depressão**, `r pct("Depressao", "Sim", "Diminuiu")`% vs `r pct("Depressao", "Não", "Diminuiu")`%.
-:::
-
-## Trabalho e fumo
-
-```{r}
-tabela_quali(res_quali[c("Trabalha", "cigarro")], dados)
-```
-
-::: {.legenda-residuo}
-`r legenda_testes` · [▲ acima do esperado]{.acima} [▼ abaixo do esperado]{.abaixo} — casela influente: \|resíduo padronizado\| > 1,96, só com p < 0,05
-:::
-
-::: {.nota}
-Nenhuma das duas variáveis apresentou associação significativa (p ≥ 0,05). Sem associação global, os resíduos não são interpretados e nenhuma casela é destacada.
-:::
-
-## Quantitativas: escolha do teste
-
-```{r}
-tabela_diagnosticos(res_quanti)
-```
-
-::: {.nota}
-Gráficos de densidade e Q-Q no apêndice. O Shapiro-Wilk rejeita a normalidade em todos os grupos, mas com grupos tão grandes detecta até **desvios pequenos**. Com **n ≥ 30** em todos (mínimo de `r formatar_num(min(table(dados$Consumo_agua)), 0)`), pelo **TCL** as médias são aproximadamente normais. Para **mais de 2 grupos**, o livro indica verificar a homocedasticidade (Levene, sem normalidade). O Levene também é sensível a n grande, mas os valores-p estão longe de 5%, então a decisão não depende do limiar.
-:::
-
-## Quantitativas: tabela resumo
-
-```{r}
-tabela_quanti(res_quanti, dados)
-```
-
-::: {.legenda-residuo}
-<sup>A</sup> ANOVA + Tukey · <sup>W</sup> ANOVA de Welch + Games-Howell · grupos com a **mesma letra** não diferem significativamente (5%)
-:::
-
-::: {.nota}
-**Idade:** as três médias diferem entre si (*Não alterou* `r media("Idade", "Não alterou")` > *Aumentou* `r media("Idade", "Aumentou")` > *Diminuiu* `r media("Idade", "Diminuiu")` anos), com efeito **pequeno** (η² = `r formatar_num(res_quanti$Idade$eta2, 3)`). **Peso:** *Diminuiu* tem média menor, mas o efeito é **desprezível** (η² = `r formatar_num(res_quanti$Peso$eta2, 3)`) e não resiste à correção de Bonferroni. **Altura** e **IMC:** sem evidência de diferença.
-:::
-
-## Quantitativas: distribuição
-
-```{r}
-#| label: grafico-boxplots
-#| fig-width: 12
-#| fig-height: 4.6
-grafico_boxplots(dados)
-```
-
-::: {.nota}
-Os boxplots confirmam o padrão da tabela: o grupo *Diminuiu* concentra pessoas **mais jovens**. Para altura e IMC, **não há evidência de diferença** entre os grupos (p ≥ 0,05).
-:::
-
-# Conclusão
-
-## Principais achados {.smaller}
-
-- O objetivo foi avaliar a associação entre a **mudança no consumo de água** e as variáveis explicativas. Quase metade da amostra **aumentou** o consumo.
-- **Redução** do consumo associou-se a **sofrimento emocional** (ansiedade, depressão, insônia, enxaqueca), **dificuldade financeira**, **menor escolaridade**, **gênero feminino** e **menor idade**.
-- **Aumento** associou-se a **isolamento**, **diagnóstico de COVID-19**, **consulta com nutricionista**, região **Norte** e raça/cor **parda/preta**.
-- **Maior renda** e **pós-graduação** associaram-se à **manutenção** do hábito.
-- **Idade** difere entre os três grupos (*Diminuiu* é o mais jovem); o **peso** tem diferença desprezível; para **altura** e **IMC** não há evidência de diferença.
-- Todas as associações são de intensidade **fraca ou muito fraca**. Com a correção de Bonferroni, as evidências de `r rotulos_de(frageis)` ficam **mais frágeis**.
-
-## Interpretação e limitações {.smaller}
-
-- **Interpretações possíveis (hipóteses, não testadas aqui):** o estresse e a desorganização da rotina podem prejudicar o autocuidado, incluindo a hidratação. Quem consultou nutricionista ou teve COVID-19 pode ter recebido orientação para beber mais água. Clima, renda e rotina podem contribuir para as diferenças regionais.
-- **Limitações:**
-  - amostra de conveniência online: `r formatar_num(100 * mean(dados$Genero == "Feminino", na.rm = TRUE), 0)`% mulheres; Sudeste (`r formatar_num(100 * mean(dados$Regiao == "Sudeste"), 0)`%) e pós-graduação (`r formatar_num(100 * mean(dados$Escolaridade == "Pós-graduação", na.rm = TRUE), 0)`%) são os maiores grupos;
-  - dados autorrelatados e delineamento transversal (associação não é causalidade);
-  - análises bivariadas, sem controle de confundimento (por exemplo, a diferença de peso pode refletir a maior proporção de mulheres em *Diminuiu*);
-  - a resposta é ordinal, mas o qui-quadrado não usa essa ordem.
-
-## Contribuição para a sociedade
-
-::: {.box-green}
-Os resultados **sugerem** grupos a observar em ações de promoção da hidratação em situações de crise: pessoas com **sofrimento emocional** (ansiedade, depressão, insônia) e com **dificuldade financeira**, as associações mais consistentes.
-:::
-
-::: {.box-blue}
-A associação entre **consulta com nutricionista** e **aumento** do consumo de água é compatível com o valor do acompanhamento nutricional, mas o desenho transversal **não permite inferir efeito**.
-:::
-
-::: {.box-orange}
-Todas as associações são **fracas ou muito fracas**: elas indicam **tendências na população**, não preveem o comportamento de cada pessoa.
-:::
-
-## {.center}
-
-<h2 style="text-align:center;">Obrigado!</h2>
-
-<p style="text-align:center;" class="slide-subtitle">Lucas Rodrigo de Moura Aragão</p>
-
-# Apêndice
-
-## O que a disciplina trouxe para este projeto
-
-::: {.tabela-grande}
-```{r}
-tibble(
-  Conteudo = c(
-    "Testes de independência",
-    "Homogeneidade e aderência",
-    "Revisão de testes de hipóteses",
-    "ANOVA de Welch (Atividade 5)",
-    "Tabelas resumo (gtsummary)",
-    "Apresentações com Quarto"
-  ),
-  Aplicacao = c(
-    "Frequências esperadas, qui-quadrado/Fisher, resíduos padronizados e V de Cramér para as 15 variáveis qualitativas",
-    "Escolha justificada do teste de independência (uma amostra, duas variáveis)",
-    "Densidade, Q-Q plot, Shapiro-Wilk, TCL para amostras grandes, Levene e ANOVA + Tukey",
-    "Welch + Games-Howell quando as variâncias são heterogêneas",
-    "tbl_summary + add_p + add_stat: n (% na linha), testes indicados por sobrescrito, valor-p em negrito, V de Cramér e letras de comparações múltiplas",
-    "Slides reprodutíveis (texto, código e resultados no mesmo documento) publicados no GitHub Pages"
-  )
-) |>
-  kbl(format = "html", col.names = c("Conteúdo da disciplina", "Onde foi aplicado")) |>
-  kable_styling(bootstrap_options = c("condensed", "hover"), full_width = FALSE) |>
-  column_spec(1, bold = TRUE, width = "16em")
-```
-:::
-
-## Independência, homogeneidade ou aderência?
-
-Os três testes usam a **mesma estatística**, χ² = Σ (O − E)² / E, mas respondem a **perguntas diferentes**:
-
-::: {.box-green}
-**Independência** — *uma* amostra classificada segundo *duas* variáveis: a distribuição de uma depende da categoria da outra? **← é o nosso caso**
-:::
-
-::: {.box-orange}
-**Homogeneidade** — amostras coletadas *separadamente* em cada população: os grupos têm a mesma distribuição?
-:::
-
-::: {.box-purple}
-**Aderência** — *uma* variável: os dados seguem uma distribuição teórica específica?
-:::
-
-::: {.nota}
-Os 2.155 participantes responderam a um único questionário, e as duas variáveis foram observadas na mesma pessoa. Por isso, aplicamos o **teste de independência**.
-:::
-
-## Verificação das suposições do qui-quadrado
-
-```{r}
-tabela_esperadas(res_quali)
-```
-
-::: {.nota}
-`r if (todas_qui) "Todas as tabelas atendem à regra de Cochran, então o **qui-quadrado** foi aplicado em todas (sem necessidade do teste exato de Fisher)." else "Nas tabelas que não atendem à regra de Cochran foi aplicado o **teste exato de Fisher** (valor-p por simulação de Monte Carlo)."`
-:::
-
-## Quantitativas: gráficos de densidade
-
-```{r}
-#| label: grafico-densidades
-#| fig-width: 12
-#| fig-height: 4.6
-grafico_densidades(dados)
-```
-
-::: {.nota}
-As distribuições de **idade**, **peso** e **IMC** são **assimétricas à direita** em todos os grupos; a altura é mais simétrica.
-:::
-
-## Quantitativas: gráficos Q-Q
-
-```{r}
-#| label: grafico-qq
-#| fig-width: 12
-#| fig-height: 5.4
-grafico_qq(dados)
-```
-
-::: {.nota}
-Em **idade**, **peso** e **IMC**, os pontos saem da banda de confiança nas caudas (**desvio da normalidade**). A **altura** fica quase toda dentro da banda.
+Bonferroni dos 19 testes: raça/cor, isolamento, renda, COVID, enxaqueca e peso não atingem o limite mais conservador. A resposta ordinal foi analisada por procedimentos que não usam sua ordenação. Dizer padrões nesta amostra, evitando generalizar para toda a população brasileira. O desenho não permite afirmar efeitos duradouros após a pandemia.
 :::

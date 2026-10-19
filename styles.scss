@@ -3,88 +3,32 @@ $body-bg: #fcfcfb;
 $body-color: #0b0b0b;
 $link-color: #1c5cab;
 $presentation-heading-color: #0d366b;
-$presentation-font-size-root: 34px;
-$presentation-h2-font-size: 1.45em;
+$presentation-font-size-root: 32px;
+$presentation-h2-font-size: 1.38em;
 
 /*-- scss:rules --*/
-.reveal .slide-subtitle,
-.reveal .nota {
-  color: #52514e;
-}
-
-.reveal .nota {
-  font-size: 0.66em;
-  line-height: 1.35;
-}
-
-.reveal table {
-  font-size: 0.56em;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.reveal table th,
-.reveal table td {
-  padding: 0.25em 0.6em;
-}
-
-.reveal table caption {
-  font-size: 1.1em;
-  color: #52514e;
-  caption-side: top;
-}
-
-.reveal .legenda-residuo {
-  font-size: 0.58em;
-  color: #52514e;
-  text-align: center;
-  margin-top: 0.4em;
-}
-
-.reveal .acima {
-  background: #e4def7;
-  font-weight: 700;
-}
-
-.reveal .abaixo {
-  background: #fbecc0;
-  font-weight: 700;
-}
-
-.reveal .destaque {
-  border-left: 6px solid #2a78d6;
-  padding-left: 0.6em;
-}
-
-/* Caixas no estilo do custom.css da disciplina (cap. 6 do livro) */
-.reveal .box-blue,
-.reveal .box-green,
-.reveal .box-orange,
-.reveal .box-purple {
-  border-radius: 8px;
-  padding: 0.45em 0.7em;
-  margin: 0.35em 0;
-  font-size: 0.72em;
-  line-height: 1.35;
-}
-
-.reveal .box-blue   { background: #e8f1fc; border-left: 6px solid #2a78d6; }
-.reveal .box-green  { background: #e6f5ec; border-left: 6px solid #1baf7a; }
-.reveal .box-orange { background: #fdeee6; border-left: 6px solid #eb6834; }
-.reveal .box-purple { background: #ecebf7; border-left: 6px solid #4a3aa7; }
-
-/* Roteiro de decisão: etapas em sequência */
-.reveal .etapa {
-  text-align: center;
-  font-size: 0.6em;
-  color: #52514e;
-  margin: 0.1em 0;
-}
-
-.reveal .tabela-grande table {
-  font-size: 0.68em;
-}
-
-.reveal .tabela-grande td {
-  padding: 0.45em 0.7em;
-}
+.reveal .slide { text-align: left; }
+.reveal h2 { margin-bottom: 0.55em; line-height: 1.12; }
+.reveal h3 { color: #0d366b; font-size: 0.85em; margin-bottom: 0.7em; }
+.reveal p, .reveal li { line-height: 1.32; }
+.reveal li { margin-bottom: 0.35em; }
+.reveal .columns { gap: 0; }
+.reveal .column { min-width: 0; box-sizing: border-box; }
+.reveal .column:not(:last-child) { padding-right: 0.7em; }
+.reveal .autoria, .reveal .subtitulo { font-size: 0.58em; color: #52514e; margin-bottom: 1.2em; }
+.reveal .pergunta { border-left: 5px solid #2a78d6; padding-left: 0.65em; margin: 0.9em 0; color: #0d366b; }
+.reveal .takeaway { border-top: 2px solid #b8c9da; padding-top: 0.45em; margin-top: 0.55em; font-size: 0.7em; line-height: 1.3; }
+.reveal .nota { font-size: 0.63em; color: #52514e; line-height: 1.3; margin-top: 0.7em; }
+.reveal .fonte { font-size: 0.43em; color: #52514e; margin-top: 0.9em; }
+.reveal .leitura { font-size: 0.65em; line-height: 1.3; margin-top: 0.6em; }
+.reveal .legenda-residuo { font-size: 16px; line-height: 1.25; color: #52514e; margin-top: 0.45em; }
+.reveal .acima { background: #e4def7; font-weight: 700; padding: 0 3px; }
+.reveal .abaixo { background: #fbecc0; font-weight: 700; padding: 0 3px; }
+.reveal .table-slide .cell { margin-bottom: 0; }
+.reveal .table-slide .gt_table { line-height: 1.12; }
+.reveal .table-slide .gt_table td:not(:first-child) { white-space: nowrap; }
+.reveal .table-slide .gt_table th, .reveal .table-slide .gt_table td { padding-left: 4px; padding-right: 4px; }
+.reveal .quant-slide .gt_table { line-height: 1.1; }
+.reveal .quant-slide .gt_table th, .reveal .quant-slide .gt_table td { padding-left: 7px; padding-right: 7px; }
+.reveal .limites { border-top: 2px solid #b8c9da; margin-top: 0.8em; padding-top: 0.55em; font-size: 0.76em; color: #52514e; }
+.reveal .fechamento { color: #0d366b; font-size: 0.83em; margin-top: 0.8em; }

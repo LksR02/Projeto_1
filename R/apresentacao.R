@@ -59,7 +59,7 @@ p_negrito <- function(p) {
 # bold_p e destaque das caselas influentes pelos resíduos padronizados
 # (> 1,96 com ▲; < -1,96 com ▼). Como no livro, os resíduos só são destacados
 # quando a associação global é significativa.
-tabela_quali <- function(resultados, dados) {
+tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco = 3) {
   vars <- names(resultados)
   siglas <- vapply(resultados, \(r) if (r$teste == "Qui-quadrado") "Q" else "F", "")
   # o n aparece no rótulo só quando há não resposta (n menor que o total)
@@ -76,7 +76,9 @@ tabela_quali <- function(resultados, dados) {
 
   cramer_fun <- function(data, variable, ...) {
     r <- resultados[[variable]]
-    tibble(`**V de Cramér**` = sprintf("%s (%s)", formatar_num(r$v, 3), tolower(r$intensidade)))
+    valor <- if (compacta) formatar_num(r$v, 3) else
+      sprintf("%s (%s)", formatar_num(r$v, 3), tolower(r$intensidade))
+    tibble(`**V de Cramér**` = valor)
   }
 
   # caselas influentes: variável, categoria, coluna da resposta e sinal
@@ -133,7 +135,14 @@ tabela_quali <- function(resultados, dados) {
   tab <- tbl |>
     as_gt() |>
     fmt_markdown(columns = label) |>
-    estilo_gt()
+    estilo_gt(fonte = fonte, espaco = espaco)
+
+  if (compacta) {
+    tab <- tab |>
+      cols_label(`**V de Cramér**` = html("<b>V</b>"), p.value = html("<b>p</b>")) |>
+      tab_options(table.width = gt::pct(100), column_labels.padding = px(3),
+                  table_body.hlines.width = px(0.5))
+  }
 
   for (k in seq_len(nrow(influentes %||% data.frame()))) {
     i <- influentes[k, ]
@@ -189,7 +198,7 @@ tabela_diagnosticos <- function(resultados) {
 # Tabela resumo das quantitativas como no livro: tbl_summary com média (DP),
 # add_p com oneway.test (var.equal = TRUE -> ANOVA "A"; FALSE -> Welch "W"),
 # η² e letras das comparações múltiplas (Tukey após ANOVA; Games-Howell após Welch).
-tabela_quanti <- function(resultados, dados) {
+tabela_quanti <- function(resultados, dados, fonte = 20) {
   vars <- names(resultados)
   rotulos <- lapply(resultados, \(r) sprintf("%s<sup>%s</sup>", r$rotulo, r$sigla))
   argumentos <- lapply(resultados, \(r) list(var.equal = r$teste == "ANOVA"))
@@ -241,7 +250,7 @@ tabela_quanti <- function(resultados, dados) {
     )) |>
     as_gt() |>
     fmt_markdown(columns = c(label, `**Comparações Múltiplas**`)) |>
-    estilo_gt(fonte = 15, espaco = 1)
+    estilo_gt(fonte = fonte, espaco = 2)
 }
 
 # Gráficos ----------------------------------------------------------------------
