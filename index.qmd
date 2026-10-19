@@ -138,11 +138,7 @@ Preparação, caso o professor pergunte: não havia células vazias no original;
 ::::
 
 ::: {.nota}
-**Significância: 5%.** Grupos independentes; amostra grande favorece a aproximação das médias pelo TCL. Verificação adicional: Bonferroni para `r n_testes` testes (α ≈ `r formatar_num(alfa_bonf, 4)`). V: &lt; 0,10 muito fraca; 0,10–0,30 fraca.
-:::
-
-::: {.fonte}
-R: readxl, dplyr, rstatix, car, ggplot2, qqplotr, gtsummary e gt · slides em Quarto.
+Nível de significância a 5%
 :::
 
 ::: {.notes}
