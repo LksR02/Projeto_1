@@ -45,7 +45,7 @@ media <- function(var, grupo) {
   formatar_num(r$media[r$Consumo_agua == grupo], 1)
 }
 legenda <- function() {
-  knitr::asis_output('<div class="legenda-residuo">n (% na linha) · <b>Q</b> qui-quadrado · <b>F</b> Fisher por Monte Carlo · <b>V</b> de Cramér · <span class="acima">▲ acima</span> / <span class="abaixo">▼ abaixo do esperado</span> (|resíduo| &gt; 1,96 e p &lt; 0,05)</div>')
+  knitr::asis_output('<div class="legenda-residuo">n (% na linha) · <b>Q</b> qui-quadrado · <b>F</b> Fisher por Monte Carlo · <b>V</b> de Cramér · <b>Em negrito:</b> caselas influentes (|resíduo padronizado| &gt; 1,96 e p &lt; 0,05)</div>')
 }
 ```
 

@@ -20,10 +20,6 @@ CORES_RESPOSTA <- c(
 
 LIMIAR_RESIDUO <- qnorm(1 - ALFA / 2)  # 1,96
 
-# Destaque das caselas influentes (cores distintas das da resposta)
-COR_ACIMA <- "#e4def7"
-COR_ABAIXO <- "#fbecc0"
-
 tema_slides <- function() {
   theme_minimal(base_size = 15) +
     theme(
@@ -57,7 +53,7 @@ p_negrito <- function(p) {
 # Tabela completa como no livro: tbl_summary(by = resposta, percent = "row"),
 # add_p (Q = qui-quadrado, F = exato de Fisher), add_stat com o V de Cramér,
 # bold_p e destaque das caselas influentes pelos resíduos padronizados
-# (> 1,96 com ▲; < -1,96 com ▼). Como no livro, os resíduos só são destacados
+# (módulo > 1,96, em negrito). Como no livro, os resíduos só são destacados
 # quando a associação global é significativa.
 tabela_quali_compacta <- function(resultados, fonte = 19, espaco = 3) {
   escapar <- function(x) as.character(htmltools::htmlEscape(x))
@@ -74,8 +70,7 @@ tabela_quali_compacta <- function(resultados, fonte = 19, espaco = 3) {
         texto <- escapar(r$celulas[i,j])
         z <- r$residuos[i,j]
         if (r$p < ALFA && abs(z) > LIMIAR_RESIDUO) {
-          texto <- sprintf('<span class="%s">%s %s</span>',
-            if (z > 0) "acima" else "abaixo", if (z > 0) "▲" else "▼", texto)
+          texto <- sprintf('<strong>%s</strong>', texto)
         }
         paste0('<td>', texto, '</td>')
       }, "")
@@ -110,7 +105,7 @@ tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco
     tibble(`**V de Cramér**` = valor)
   }
 
-  # caselas influentes: variável, categoria, coluna da resposta e sinal
+  # caselas influentes: variável, categoria e coluna da resposta
   influentes <- do.call(rbind, lapply(resultados, function(r) {
     if (r$p >= ALFA) return(NULL)
     z <- r$residuos
@@ -119,8 +114,7 @@ tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco
     data.frame(
       variable = r$variavel,
       label = rownames(z)[idx[, 1]],
-      coluna = paste0("stat_", idx[, 2]),
-      acima = z[idx] > 0
+      coluna = paste0("stat_", idx[, 2])
     )
   }))
 
@@ -147,20 +141,6 @@ tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco
     bold_labels() |>
     remove_footnote_header(everything())
 
-  if (!is.null(influentes)) {
-    tbl <- tbl |>
-      modify_table_body(function(corpo) {
-        for (k in seq_len(nrow(influentes))) {
-          i <- influentes[k, ]
-          linha <- corpo$variable == i$variable & corpo$row_type == "level" &
-            corpo$label == i$label
-          corpo[[i$coluna]][linha] <- paste(if (i$acima) "▲" else "▼",
-                                            corpo[[i$coluna]][linha])
-        }
-        corpo
-      })
-  }
-
   tab <- tbl |>
     as_gt() |>
     fmt_markdown(columns = label) |>
@@ -177,8 +157,7 @@ tabela_quali <- function(resultados, dados, compacta = FALSE, fonte = 19, espaco
     i <- influentes[k, ]
     tab <- tab |>
       tab_style(
-        style = list(cell_fill(color = if (i$acima) COR_ACIMA else COR_ABAIXO),
-                     cell_text(weight = "bold")),
+        style = cell_text(weight = "bold"),
         locations = cells_body(
           columns = all_of(i$coluna),
           rows = variable == i$variable & row_type == "level" & label == i$label

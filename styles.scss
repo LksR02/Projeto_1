@@ -28,8 +28,6 @@ $presentation-h2-font-size: 1.38em;
 .reveal .fonte { font-size: 0.43em; color: #52514e; margin-top: 0.9em; }
 .reveal .leitura { font-size: 0.65em; line-height: 1.3; margin-top: 0.6em; }
 .reveal .legenda-residuo { font-size: 16px; line-height: 1.25; color: #52514e; margin-top: 0.45em; }
-.reveal .acima { background: #e4def7; font-weight: 700; padding: 0 3px; }
-.reveal .abaixo { background: #fbecc0; font-weight: 700; padding: 0 3px; }
 .reveal .table-slide .cell { margin-bottom: 0; }
 .reveal .table-slide .gt_table { line-height: 1.12; }
 .reveal .table-slide .gt_table td:not(:first-child) { white-space: nowrap; }
@@ -42,7 +40,6 @@ $presentation-h2-font-size: 1.38em;
 .reveal .tabela-compacta thead th:first-child { text-align: left; }
 .reveal .tabela-compacta .variavel th { text-align: left; padding-top: 9px; padding-bottom: 5px; color: #0d366b; background: #f0f3f6; font-weight: 700; }
 .reveal .tabela-compacta td:not(:first-child) { text-align: right; white-space: nowrap; }
-.reveal .tabela-compacta .acima, .reveal .tabela-compacta .abaixo { padding: 1px 2px; }
 .reveal .tabela-compacta sup, .reveal .tabela-quanti sup { font-size: 0.7em; }
 .reveal .tabela-quanti th, .reveal .tabela-quanti td { padding: 8px 5px; border-bottom: 1px solid #dadde0; text-align: right; vertical-align: middle; }
 .reveal .tabela-quanti th:first-child, .reveal .tabela-quanti td:first-child { text-align: left; }
