@@ -49,7 +49,7 @@ legenda <- function() {
 }
 ```
 
-## Pandemia, rotina e consumo de água {#introducao}
+## Pandemia, rotina e consumo de água {#introducao background-image="assets/capa-agua-pandemia.png" background-size="cover" background-position="center" background-color="#fcfcfb"}
 
 ::: {.autoria}
 PROJETO I · Lucas Rodrigo de Moura Aragão · UFF

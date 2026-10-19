@@ -8,6 +8,12 @@ $presentation-h2-font-size: 1.38em;
 
 /*-- scss:rules --*/
 .reveal .slide { text-align: left; }
+.reveal .backgrounds > .slide-background:first-child .slide-background-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(252,252,251,0.98) 0%, rgba(252,252,251,0.94) 48%, rgba(252,252,251,0.65) 76%, rgba(252,252,251,0.32) 100%);
+}
 .reveal h2 { margin-bottom: 0.55em; line-height: 1.12; }
 .reveal h3 { color: #0d366b; font-size: 0.85em; margin-bottom: 0.7em; }
 .reveal p, .reveal li { line-height: 1.32; }
